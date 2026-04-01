@@ -1,0 +1,7 @@
+{
+  "groupId": "@project.groupId@",
+  "artifactId": "@project.artifactId@",
+  "description": "Bill of Materials for zora project, manages all dependency versions",
+  "version": "@project.version@",
+  "scmUrl": "https://github.com/ilovemyhome/zora"
+}

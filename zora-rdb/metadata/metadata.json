@@ -1,0 +1,7 @@
+{
+  "groupId": "top.ilovemyhome",
+  "artifactId": "zora-rdb",
+  "description": "Common relational database utilities including connection pooling, Flyway migration, and other database-related helpers",
+  "version": "${revision}",
+  "scmUrl": "https://github.com/ilovemyhome/zora"
+}

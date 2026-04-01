@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>top.ilovemyhome</groupId>
+        <artifactId>zora</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <groupId>top.ilovemyhome.zora</groupId>
+    <artifactId>zora-bom</artifactId>
+    <packaging>pom</packaging>
+    <name>zora-bom - Bill of Materials</name>
+    <description>Bill of Materials for zora project, manages all dependency versions</description>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- zora modules -->
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-dependencies</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-jdbi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-config</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-text</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-muserver</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-httpclient</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-cli-tools</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-flyway-cli</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-json</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-static</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-rdb</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>metadata</directory>
+                <filtering>true</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+    </build>
+
+</project>

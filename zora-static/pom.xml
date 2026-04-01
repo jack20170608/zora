@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>top.ilovemyhome.zora</groupId>
+        <artifactId>zora-parent</artifactId>
+        <version>${revision}</version>
+        <relativePath>../zora-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>zora-static</artifactId>
+    <packaging>jar</packaging>
+    <name>zora-static - Static Resources Aggregator</name>
+    <description>Aggregator module for storing static resources such as SQL migration scripts, configuration templates, and other static assets</description>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>metadata</directory>
+                <filtering>true</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+        </testResources>
+    </build>
+
+</project>

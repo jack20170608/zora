@@ -1,0 +1,28 @@
+[
+  {
+    "id": 2,
+    "firstName": "lucy",
+    "lastName": "green",
+    "birthDate": "2008-01-08",
+    "insertDt": "2024-01-08 12:18:12.000",
+    "sex": "Woman",
+    "address": {
+      "city": "HangZhou",
+      "street": "BeiJin Road",
+      "number": "No 99"
+    }
+  },
+  {
+    "id": 1,
+    "firstName": "jack",
+    "sex": "Man",
+    "lastName": "fang",
+    "birthDate": "2008-08-08",
+    "insertDt": "2024-08-08 12:15:12.000",
+    "address": {
+      "city": "GuangZhou",
+      "street": "BeiJin Road",
+      "number": "No 88"
+    }
+  }
+]

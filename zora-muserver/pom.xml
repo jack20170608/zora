@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>top.ilovemyhome.zora</groupId>
+        <artifactId>zora-parent</artifactId>
+        <version>${revision}</version>
+        <relativePath>../zora-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>zora-muserver</artifactId>
+    <name>zora-muserver - Muserver Utilities</name>
+    <description>Utilities and extensions for the Muserver embedded web server</description>
+
+    <dependencies>
+        <!-- zora-common -->
+        <dependency>
+            <groupId>top.ilovemyhome.zora</groupId>
+            <artifactId>zora-common</artifactId>
+        </dependency>
+
+        <!-- zora-text -->
+        <dependency>
+            <groupId>top.ilovemyhome.zora</groupId>
+            <artifactId>zora-text</artifactId>
+        </dependency>
+
+        <!-- zora-config -->
+        <dependency>
+            <groupId>top.ilovemyhome.zora</groupId>
+            <artifactId>zora-config</artifactId>
+        </dependency>
+
+        <!-- Muserver -->
+        <dependency>
+            <groupId>io.muserver</groupId>
+            <artifactId>mu-server</artifactId>
+        </dependency>
+
+        <!-- SLF4J API -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- JJWT for JWT support -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt</artifactId>
+        </dependency>
+
+        <!-- Testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- SLF4J simple implementation for testing -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>metadata</directory>
+                <filtering>true</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+        </testResources>
+    </build>
+
+</project>

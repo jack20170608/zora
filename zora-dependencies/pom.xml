@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>top.ilovemyhome</groupId>
+        <artifactId>zora</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <groupId>top.ilovemyhome.zora</groupId>
+    <artifactId>zora-dependencies</artifactId>
+    <packaging>pom</packaging>
+    <name>zora-dependencies - Dependencies Management</name>
+    <description>Manages all third-party dependency versions for the zora project</description>
+
+    <properties>
+        <!-- Third party dependencies versions -->
+        <junit.version>5.14.3</junit.version>
+        <slf4j.version>2.0.9</slf4j.version>
+        <logback.version>1.5.25</logback.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
+        <guava.version>33.5.0-jre</guava.version>
+        <flyway.version>11.8.2</flyway.version>
+        <mockito.version>5.18.0</mockito.version>
+        <assertj.version>3.27.7</assertj.version>
+        <jackson.version>2.21.2</jackson.version>
+        <jdbi3.version>3.51.0</jdbi3.version>
+        <muserver.version>2.2.6</muserver.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Logging -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+            <!-- Commons -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${commons-lang3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+            <!-- the muserver -->
+            <dependency>
+                <groupId>io.muserver</groupId>
+                <artifactId>mu-server</artifactId>
+                <version>${muserver.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt</artifactId>
+                <version>0.13.0</version>
+            </dependency>
+            <!-- the duckdb -->
+            <dependency>
+                <groupId>org.duckdb</groupId>
+                <artifactId>duckdb_jdbc</artifactId>
+                <version>1.3.3</version>
+            </dependency>
+            <!-- Source: https://mvnrepository.com/artifact/com.github.ben-manes.caffeine/caffeine -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>3.2.3</version>
+                <scope>compile</scope>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/info.picocli/picocli -->
+            <dependency>
+                <groupId>info.picocli</groupId>
+                <artifactId>picocli</artifactId>
+                <version>4.7.7</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/org.flywaydb/flyway-core -->
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-core</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>${flyway.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.typesafe</groupId>
+                <artifactId>config</artifactId>
+                <version>1.4.3</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/org.jdbi/jdbi3-bom -->
+            <dependency>
+                <groupId>org.jdbi</groupId>
+                <artifactId>jdbi3-bom</artifactId>
+                <version>${jdbi3.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/com.zaxxer/HikariCP -->
+            <dependency>
+                <groupId>com.zaxxer</groupId>
+                <artifactId>HikariCP</artifactId>
+                <version>7.0.2</version>
+            </dependency>
+            <!-- the Jackson bom -->
+            <!-- Source: https://mvnrepository.com/artifact/com.fasterxml.jackson/jackson-bom -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>2.21.2</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- the Micrometer bom for monitor purpose -->
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-bom</artifactId>
+                <version>1.16.1</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+            <!-- Testing -->
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- the Mockito 5 unit test -->
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-bom</artifactId>
+                <version>${mockito.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- the AssertJ 3 unit test -->
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-bom</artifactId>
+                <version>${assertj.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.zonky.test.postgres</groupId>
+                <artifactId>embedded-postgres-binaries-bom</artifactId>
+                <version>17.4.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.zonky.test</groupId>
+                <artifactId>embedded-postgres</artifactId>
+                <version>2.1.0</version>
+            </dependency>
+            <!-- PostgreSQL JDBC Driver -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>42.7.7</version>
+            </dependency>
+            <!-- H2 Database for testing -->
+            <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2</artifactId>
+                <version>2.4.240</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>metadata</directory>
+                <filtering>true</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+    </build>
+
+</project>

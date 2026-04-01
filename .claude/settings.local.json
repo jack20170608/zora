@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Bash(chmod:*)",
+      "Bash(mvn clean:*)",
+      "Bash(mvn -Dtest=ConfigLoaderTest -pl zora-config test)",
+      "Bash(cat zora-config/target/surefire-reports/*.txt)",
+      "Bash(mvn test:*)",
+      "Bash(mvn install:*)",
+      "WebSearch",
+      "WebFetch(domain:search.maven.org)",
+      "WebFetch(domain:mvnrepository.com)",
+      "Bash(mvn -U install -DskipTests)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn dependency:list)",
+      "Bash(mvn dependency:tree -Dverbose)",
+      "Bash(mvn:*)",
+      "Bash(xargs grep:*)",
+      "Bash(ls:*)",
+      "Read(//d/project-ai/use-ai/zora/$HOME/.m2/repository/top/ilovemyhome/zora/**)"
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>top.ilovemyhome.zora</groupId>
+        <artifactId>zora-parent</artifactId>
+        <version>${revision}</version>
+        <relativePath>../zora-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>zora-cli-tools</artifactId>
+    <packaging>pom</packaging>
+    <name>zora-cli-tools - CLI Tools Parent Module</name>
+    <description>Aggregator module containing multiple command-line tools for zora project</description>
+
+    <modules>
+        <module>zora-flyway-cli</module>
+    </modules>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>metadata</directory>
+                <filtering>true</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+    </build>
+
+</project>
