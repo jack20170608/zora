@@ -135,4 +135,4 @@ build.bat clean install
 
 ## 作者
 
-Zora 项目由 top.ilovemyhome 维护
+Zora 项目由 [jack github](https://github.com/jack20170608) 维护
