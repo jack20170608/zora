@@ -56,3 +56,18 @@
         <scope>test</scope>
     </dependency>
 ```
+
+- 所有的模块的测试部分，都在test/resources/目录下添加`simplelogger.properties`的文件，用来配置slf4j-simple的日志输出格式.
+```properties
+# Configure slf4j simple logger for testing
+org.slf4j.simpleLogger.defaultLogLevel = info
+org.slf4j.simpleLogger.logFile = System.out
+org.slf4j.simpleLogger.showDateTime = true
+# 设置日期时间格式
+org.slf4j.simpleLogger.dateTimeFormat =yyyy-MM-dd HH:mm:ss.SSS
+# 显示线程名称
+org.slf4j.simpleLogger.showThreadName = true
+org.slf4j.simpleLogger.showLogName = true
+# 日志级别显示在方括号内
+org.slf4j.simpleLogger.levelInBrackets = true
+```
