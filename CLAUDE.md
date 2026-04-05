@@ -10,6 +10,7 @@
 - 项目开发生成的文档采用中文
 - 初始化子模块的时候，同步创建`main/resource`和`test/resource`目录，方便后续存放配置文件和测试资源。
 - 为每一个子模块都生成`metadata/metadata.json`文件，包含模块的基本信息、功能描述等内容，并把metadata放到resource里面，enable filter，方便后续的维护和管理,metadata文件的格式可以参考以下示例.
+- 每次单独build子模块的时候，都需要从VERSION文件中读取版本号
 ```json
 {
   "groupId": "@project.groupId@",

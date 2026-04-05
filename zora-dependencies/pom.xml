@@ -81,7 +81,6 @@
                 <groupId>io.swagger.core.v3</groupId>
                 <artifactId>swagger-annotations</artifactId>
                 <version>2.2.20</version>
-                <scope>provided</scope>
             </dependency>
             <!-- the duckdb -->
             <dependency>
