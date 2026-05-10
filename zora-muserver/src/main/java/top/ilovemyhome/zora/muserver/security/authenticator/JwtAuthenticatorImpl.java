@@ -18,6 +18,8 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 
+import static io.jsonwebtoken.Jwts.*;
+
 
 public class JwtAuthenticatorImpl implements JwtAuthenticator {
 
@@ -26,12 +28,12 @@ public class JwtAuthenticatorImpl implements JwtAuthenticator {
 
     public JwtAuthenticatorImpl(
         String issuer
-        , String subject
+        , String audience
         , long ttl
         , String publicKeyPath
         , String privateKeyPath) {
         this.issuer = issuer;
-        this.subject = subject;
+        this.audience = audience;
         this.ttl = ttl <= 0L ? DEFAULT_TTL : ttl;
         this.jwtSignPrivateKey = resolvePrivateKey(privateKeyPath);
         this.jwtSignPublicKey = resolvePublicKey(publicKeyPath);
@@ -57,7 +59,7 @@ public class JwtAuthenticatorImpl implements JwtAuthenticator {
     @Override
     public String generateJwt(User user) {
         long expirationTime = System.currentTimeMillis() + this.ttl;
-        return Jwts.builder()
+        return builder()
             .header()
             .type("JWT")
             .add("alg", "RS256")
@@ -66,12 +68,10 @@ public class JwtAuthenticatorImpl implements JwtAuthenticator {
             .issuer(this.issuer)
             .expiration(new Date(expirationTime))
             .issuedAt(Calendar.getInstance(TimeZone.getDefault()).getTime())
-            .subject(this.subject)
             .claims(Map.of("id", user.id(), "name", user.name()
                 , "displayName", user.displayName()
                 , "roles", String.join(",", user.roles())))
-            .audience()
-//            .add(audiences)
+            .audience().add(this.audience)
             .and()
             .signWith(this.jwtSignPrivateKey)
             .compact()
@@ -79,7 +79,7 @@ public class JwtAuthenticatorImpl implements JwtAuthenticator {
     }
 
     private Claims validateToken(String token) {
-        return Jwts.parser()
+        return parser()
             .verifyWith(this.jwtSignPublicKey)
             .requireIssuer(issuer)
             .build()
@@ -139,7 +139,7 @@ public class JwtAuthenticatorImpl implements JwtAuthenticator {
 
     //7 days
     private static final long DEFAULT_TTL = 1000 * 60 * 60 * 24 * 7;
-    private final String subject;
+    private final String audience;
     private final long ttl;
     private final String issuer;
     private final transient PrivateKey jwtSignPrivateKey;

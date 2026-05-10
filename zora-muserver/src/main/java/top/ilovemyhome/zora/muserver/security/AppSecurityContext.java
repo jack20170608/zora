@@ -35,7 +35,7 @@ public class AppSecurityContext {
         List<User> inMemoryUser
         , LdapClient ldapClient
         , String jwtIssuer
-        , String jwtSubject
+        , String jwtAudience
         , long jwtTtl
         , String jwtPublicKeyPath
         , String jwtPrivateKeyPath
@@ -70,7 +70,7 @@ public class AppSecurityContext {
         }
         //3. The JWT authentication filter
         if (Objects.nonNull(jwtIssuer) && Objects.nonNull(jwtPublicKeyPath) && Objects.nonNull(jwtPrivateKeyPath)) {
-            this.jwtAuthenticator = new JwtAuthenticatorImpl(jwtIssuer, jwtSubject, jwtTtl, jwtPublicKeyPath, jwtPrivateKeyPath);
+            this.jwtAuthenticator = new JwtAuthenticatorImpl(jwtIssuer, jwtAudience, jwtTtl, jwtPublicKeyPath, jwtPrivateKeyPath);
             BearerAuthSecurityFilter jwtAuthSecurityFilter = new BearerAuthSecurityFilter(
                 this.jwtAuthenticator
                 , authorizer
