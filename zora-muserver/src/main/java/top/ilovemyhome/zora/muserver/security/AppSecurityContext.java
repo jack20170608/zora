@@ -128,7 +128,7 @@ public class AppSecurityContext {
         private List<User> inMemoryUser;
         private LdapClient ldapClient;
         private String jwtIssuer;
-        private String jwtSubject;
+        private String jwtAudience;
         private long jwtTtl;
         private String jwtPublicKeyPath;
         private String jwtPrivateKeyPath;
@@ -151,8 +151,8 @@ public class AppSecurityContext {
             return this;
         }
 
-        public Builder jwtSubject(String jwtSubject) {
-            this.jwtSubject = jwtSubject;
+        public Builder jwtAudience(String jwtAudience) {
+            this.jwtAudience = jwtAudience;
             return this;
         }
 
@@ -191,7 +191,7 @@ public class AppSecurityContext {
                 inMemoryUser,
                 ldapClient,
                 jwtIssuer,
-                jwtSubject,
+                jwtAudience,
                 jwtTtl,
                 jwtPublicKeyPath,
                 jwtPrivateKeyPath,
