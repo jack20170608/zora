@@ -18,17 +18,17 @@
 
     <properties>
         <!-- Third party dependencies versions -->
-        <junit.version>5.14.3</junit.version>
-        <slf4j.version>2.0.9</slf4j.version>
-        <logback.version>1.5.25</logback.version>
-        <commons-lang3.version>3.18.0</commons-lang3.version>
-        <guava.version>33.5.0-jre</guava.version>
+        <junit.version>5.14.4</junit.version>
+        <slf4j.version>2.0.17</slf4j.version>
+        <logback.version>1.5.32</logback.version>
+        <commons-lang3.version>3.20.0</commons-lang3.version>
+        <guava.version>33.6.0-jre</guava.version>
         <flyway.version>11.8.2</flyway.version>
-        <mockito.version>5.18.0</mockito.version>
+        <mockito.version>5.23.0</mockito.version>
         <assertj.version>3.27.7</assertj.version>
-        <jackson.version>2.21.2</jackson.version>
-        <jdbi3.version>3.51.0</jdbi3.version>
-        <muserver.version>2.2.6</muserver.version>
+        <jackson.version>2.21.3</jackson.version>
+        <jdbi3.version>3.53.0</jdbi3.version>
+        <muserver.version>2.2.7</muserver.version>
     </properties>
 
     <dependencyManagement>
