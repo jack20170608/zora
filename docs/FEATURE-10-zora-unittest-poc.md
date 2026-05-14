@@ -64,8 +64,16 @@ mvn test -pl zora-poc/zora-unittest-poc/zora-junit5-poc
 
 ## 测试统计
 
-当前共 27 个测试用例：
+当前共 38 个测试用例：
 - `JUnit5BasicTest`：6 个（含 1 个 disabled）
 - `JUnit5AdvancedTest`：12 个（参数化 + 动态测试）
 - `AssertJExploreTest`：4 个
 - `MockitoExploreTest`：5 个
+- `CombinedFrameworkTest`：11 个（JUnit 5 + AssertJ + Mockito 组合场景，用户注册服务）
+
+### 组合场景说明
+
+`CombinedFrameworkTest` 模拟了一个真实的用户注册服务，展示三个框架如何配合：
+- **JUnit 5**：`@Nested` 组织成功注册/验证失败/业务规则失败/边界情况四大场景，`@ParameterizedTest` 覆盖边界输入
+- **Mockito**：`@Mock` + `@InjectMocks` 注入依赖，`when/thenReturn` 打桩，`verify` 验证交互，`inOrder` 验证调用顺序
+- **AssertJ**：`assertThatThrownBy` 验证异常类型和消息，`argThat` 自定义参数匹配
