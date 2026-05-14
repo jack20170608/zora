@@ -20,6 +20,7 @@
 
     <modules>
         <module>zora-java-logger-poc</module>
+        <module>zora-unittest-poc</module>
     </modules>
 
     <build>
