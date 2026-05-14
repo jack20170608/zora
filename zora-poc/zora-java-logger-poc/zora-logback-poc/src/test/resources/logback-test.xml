@@ -86,6 +86,30 @@
     </appender>
 
     <!-- ============================== -->
+    <!-- 7. Sifting Appender (MDC)      -->
+    <!-- ============================== -->
+    <!--
+      SiftingAppender creates a distinct file appender at runtime
+      based on an MDC key. This is the declarative alternative to
+      programmatic dynamic logger creation.
+    -->
+    <appender name="SIFTING" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator class="ch.qos.logback.classic.sift.MDCBasedDiscriminator">
+            <key>tenantId</key>
+            <defaultValue>unknown</defaultValue>
+        </discriminator>
+        <sift>
+            <appender name="TENANT-${tenantId}" class="ch.qos.logback.core.FileAppender">
+                <file>${LOG_DIR}/tenant-${tenantId}.log</file>
+                <append>false</append>
+                <encoder>
+                    <pattern>${LOG_PATTERN}</pattern>
+                </encoder>
+            </appender>
+        </sift>
+    </appender>
+
+    <!-- ============================== -->
     <!-- Logger Routing                 -->
     <!-- ============================== -->
 
@@ -106,7 +130,14 @@
     </logger>
 
     <!--
-      Pattern C: Root logger -> console + error file + rolling.
+      Pattern C: Sifting logger -> file per MDC tenantId.
+    -->
+    <logger name="top.ilovemyhome.zora.poc.logger.sifting" level="INFO" additivity="false">
+        <appender-ref ref="SIFTING"/>
+    </logger>
+
+    <!--
+      Pattern D: Root logger -> console + error file + rolling.
       Error file only receives ERROR because of its LevelFilter.
     -->
     <root level="INFO">

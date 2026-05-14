@@ -25,9 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>Pattern D</b>: Level-based filtering routes ERROR messages to a separate file.</li>
  * </ul>
  */
-class MultipleFileLoggingTest {
+class StaticMultipleFileLoggingTest {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MultipleFileLoggingTest.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(StaticMultipleFileLoggingTest.class);
     private static final Logger AUDIT_LOGGER = LoggerFactory.getLogger("AUDIT");
     private static final Logger SERVICE_LOGGER =
         LoggerFactory.getLogger("top.ilovemyhome.zora.poc.logger.service.OrderService");
