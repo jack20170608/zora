@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logback configuration demonstrating multiple file appenders.
+
+  Patterns shown:
+  1. Different loggers -> different files (by logger name)
+  2. Same logger -> multiple files (by level filter)
+  3. Rolling file appenders for daily rotation
+-->
+<configuration>
+
+    <!-- Shared properties -->
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+    <property name="LOG_DIR" value="target/logs"/>
+
+    <!-- ============================== -->
+    <!-- 1. Console Appender (default)  -->
+    <!-- ============================== -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================== -->
+    <!-- 2. Application Log (INFO+)     -->
+    <!-- ============================== -->
+    <appender name="APP_FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_DIR}/application.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================== -->
+    <!-- 3. Error Log (ERROR only)      -->
+    <!-- ============================== -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_DIR}/error.log</file>
+        <append>false</append>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================== -->
+    <!-- 4. Audit Log (dedicated file)  -->
+    <!-- ============================== -->
+    <appender name="AUDIT_FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_DIR}/audit.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [AUDIT] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================== -->
+    <!-- 5. Rolling Daily Log           -->
+    <!-- ============================== -->
+    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/rolling.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>${LOG_DIR}/rolling.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- keep 30 days' worth of history -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================== -->
+    <!-- 6. Async Appender (wraps APP)  -->
+    <!-- ============================== -->
+    <appender name="ASYNC_APP_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="APP_FILE"/>
+        <queueSize>512</queueSize>
+    </appender>
+
+    <!-- ============================== -->
+    <!-- Logger Routing                 -->
+    <!-- ============================== -->
+
+    <!--
+      Pattern A: Dedicated logger name -> audit file only.
+      Any logger whose name starts with "AUDIT" goes here.
+    -->
+    <logger name="AUDIT" level="INFO" additivity="false">
+        <appender-ref ref="AUDIT_FILE"/>
+    </logger>
+
+    <!--
+      Pattern B: Service layer logger -> application + rolling.
+    -->
+    <logger name="top.ilovemyhome.zora.poc.logger.service" level="DEBUG" additivity="false">
+        <appender-ref ref="APP_FILE"/>
+        <appender-ref ref="ROLLING_FILE"/>
+    </logger>
+
+    <!--
+      Pattern C: Root logger -> console + error file + rolling.
+      Error file only receives ERROR because of its LevelFilter.
+    -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ERROR_FILE"/>
+        <appender-ref ref="ROLLING_FILE"/>
+    </root>
+
+</configuration>
