@@ -11,14 +11,15 @@
         <relativePath>../../zora-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>zora-java-logger-poc</artifactId>
+    <artifactId>zora-logger-poc</artifactId>
     <packaging>pom</packaging>
-    <name>zora-java-logger-poc - Java Logging Framework Exploration</name>
+    <name>zora-logger-poc - Logger Framework Exploration</name>
     <description>Aggregator POC module for exploring various Java logging frameworks.
         All code lives in test scope and is not packaged into production artifacts.
     </description>
 
     <modules>
+        <module>zora-logger-common</module>
         <module>zora-logback-poc</module>
     </modules>
 

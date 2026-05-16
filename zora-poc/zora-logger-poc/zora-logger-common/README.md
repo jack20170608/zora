@@ -1,4 +1,4 @@
-# zora-java-logger-common
+# zora-logger-common
 
 Shared utilities and test infrastructure for Java logging framework exploration.
 

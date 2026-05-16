@@ -93,21 +93,21 @@ MDC.clear();
 Run a single test class:
 
 ```bash
-mvn test -pl zora-poc/zora-java-logger-poc/zora-logback-poc -Dtest=MultipleFileLoggingTest
-mvn test -pl zora-poc/zora-java-logger-poc/zora-logback-poc -Dtest=DynamicLoggerCreationTest
-mvn test -pl zora-poc/zora-java-logger-poc/zora-logback-poc -Dtest=SiftingAppenderTest
+mvn test -pl zora-poc/zora-logger-poc/zora-logback-poc -Dtest=MultipleFileLoggingTest
+mvn test -pl zora-poc/zora-logger-poc/zora-logback-poc -Dtest=DynamicLoggerCreationTest
+mvn test -pl zora-poc/zora-logger-poc/zora-logback-poc -Dtest=SiftingAppenderTest
 ```
 
 Run all tests in the module:
 
 ```bash
-mvn test -pl zora-poc/zora-java-logger-poc/zora-logback-poc
+mvn test -pl zora-poc/zora-logger-poc/zora-logback-poc
 ```
 
 Or from the module directory:
 
 ```bash
-cd zora-poc/zora-java-logger-poc/zora-logback-poc
+cd zora-poc/zora-logger-poc/zora-logback-poc
 mvn test
 ```
 

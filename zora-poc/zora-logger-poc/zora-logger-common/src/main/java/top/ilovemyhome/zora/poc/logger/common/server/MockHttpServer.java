@@ -53,7 +53,7 @@ public class MockHttpServer implements AutoCloseable {
      * @throws IOException if the server cannot be created
      */
     public static MockHttpServer create(int port) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         ExecutorService exec = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "mock-http-server-worker");
             t.setDaemon(true);

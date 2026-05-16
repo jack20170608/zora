@@ -6,30 +6,41 @@
 
     <parent>
         <groupId>top.ilovemyhome.zora</groupId>
-        <artifactId>zora-java-logger-poc</artifactId>
+        <artifactId>zora-logger-poc</artifactId>
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>zora-java-logger-common</artifactId>
-    <name>zora-java-logger-common - Shared Logger Test Utilities</name>
-    <description>Common utilities and test infrastructure shared across logger POC modules.
-        Provides mock servers, log file assertions, and reusable test helpers.
+    <artifactId>zora-logback-poc</artifactId>
+    <name>zora-logback-poc - Logback Exploration</name>
+    <description>POC sub-module for exploring Logback logging framework features.
+        All code lives in test scope and is not packaged into production artifacts.
     </description>
 
     <dependencies>
-        <!-- SLF4J API -->
+        <!-- Shared logger test utilities -->
+        <dependency>
+            <groupId>top.ilovemyhome.zora</groupId>
+            <artifactId>zora-logger-common</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Logback (includes SLF4J binding) -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- SLF4J API (used by Logback) -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <!-- Testing -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>

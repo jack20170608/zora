@@ -54,5 +54,22 @@ public class StartTestServer {
         return muServer;
     }
 
+    /**
+     * Starts a lightweight HTTP server on a random free port with a custom handler.
+     *
+     * <p>The {@code customizer} receives a {@link MuServerBuilder} pre-configured
+     * with {@code withHttpPort(0)} so that callers only need to add handlers.</p>
+     *
+     * @param customizer a callback to register handlers before the server starts
+     * @return the started {@link MuServer}
+     */
+    public static MuServer start(java.util.function.Consumer<io.muserver.MuServerBuilder> customizer) {
+        io.muserver.MuServerBuilder builder = muServer().withHttpPort(0);
+        customizer.accept(builder);
+        MuServer muServer = builder.start();
+        LOGGER.info("Started custom test server at http={}", muServer.httpUri());
+        return muServer;
+    }
+
     private static final Logger LOGGER = LoggerFactory.getLogger(StartTestServer.class);
 }
