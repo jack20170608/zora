@@ -28,7 +28,7 @@
         <assertj.version>3.27.7</assertj.version>
         <jackson.version>2.21.3</jackson.version>
         <jdbi3.version>3.53.0</jdbi3.version>
-        <muserver.version>2.2.7</muserver.version>
+        <muserver.version>2.2.8</muserver.version>
     </properties>
 
     <dependencyManagement>
