@@ -21,6 +21,7 @@
     <modules>
         <module>zora-logger-poc</module>
         <module>zora-unittest-poc</module>
+        <module>zora-persistence-poc</module>
     </modules>
 
     <build>
