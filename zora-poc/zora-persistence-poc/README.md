@@ -8,7 +8,7 @@
 
 ## 子模块
 
-（待添加）
+- `zora-rocksdb-poc` — RocksDB Java API 功能与特性预研
 
 ## 运行测试
 

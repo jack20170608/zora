@@ -6,23 +6,25 @@
 
     <parent>
         <groupId>top.ilovemyhome.zora</groupId>
-        <artifactId>zora-poc</artifactId>
+        <artifactId>zora-persistence-poc</artifactId>
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>zora-persistence-poc</artifactId>
-    <packaging>pom</packaging>
-    <name>zora-persistence-poc - Persistence POC Aggregator</name>
-    <description>Aggregator POC module for exploring data persistence frameworks and patterns.
+    <artifactId>zora-rocksdb-poc</artifactId>
+    <name>zora-rocksdb-poc - RocksDB Exploration</name>
+    <description>POC sub-module for exploring RocksDB features and APIs.
         All code lives in test scope and is not packaged into production artifacts.
     </description>
 
-    <modules>
-        <module>zora-rocksdb-poc</module>
-    </modules>
-
     <dependencies>
+        <!-- RocksDB -->
+        <dependency>
+            <groupId>org.rocksdb</groupId>
+            <artifactId>rocksdbjni</artifactId>
+            <version>9.10.0</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.slf4j</groupId>
