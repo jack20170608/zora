@@ -22,3 +22,8 @@ mvn test -pl zora-persistence-poc
 mvn test -pl zora-poc/zora-persistence-poc
 ```
 
+
+## Ref
+
+-[RocksDB 在 vivo 消息推送系统中的实践](https://xie.infoq.cn/article/b57ceb6d869f98b22fbdc35bb)
+
