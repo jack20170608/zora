@@ -21,3 +21,4 @@ mvn test -pl zora-persistence-poc
 ```bash
 mvn test -pl zora-poc/zora-persistence-poc
 ```
+
