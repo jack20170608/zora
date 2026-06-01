@@ -10,7 +10,7 @@ public class DataTapeTest {
     @Test
     void testDataTapeV1(){
 
-        try (DataTapeV1 tape = new DataTapeV1("./my-tape-with-time-index")) {
+        try (DataTapeV1 tape = new DataTapeV1("D:\\jack\\temp\\my-tape-with-time-index")) {
             // 写入3条记录（会自动记录时间）
             tape.append("订单A：支付100元".getBytes());
             Thread.sleep(10);
