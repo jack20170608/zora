@@ -132,6 +132,20 @@ public final class KeyCodec {
     }
 
     /**
+     * Returns the prefix for scanning all edges connected to a vertex,
+     * regardless of edge type or direction.
+     *
+     * @param vertexId the vertex id
+     * @return 9-byte prefix
+     */
+    public static byte[] edgePrefix(long vertexId) {
+        ByteBuffer buf = ByteBuffer.allocate(1 + 8);
+        buf.put(PREFIX_EDGE);
+        buf.putLong(vertexId);
+        return buf.array();
+    }
+
+    /**
      * Decodes the source id from an edge key.
      * For outgoing edges, src is at offset 1; for incoming, src is at offset 14.
      */

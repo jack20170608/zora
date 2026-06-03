@@ -1,7 +1,7 @@
 package top.ilovemyhome.zora.poc.persistence.rocksdb.timeindex;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.rocksdb.*;
-import com.alibaba.fastjson2.JSON;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +19,7 @@ import java.util.*;
  */
 public class FilterableFileStore implements AutoCloseable {
     private final RocksDB db;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int CHUNK_SIZE = 256 * 1024;
 
     static {
@@ -43,7 +44,7 @@ public class FilterableFileStore implements AutoCloseable {
 
         // 保存元数据
         FileMeta meta = new FileMeta(timestamp, fileId, originalName, size, contentType);
-        db.put(buildMetaKey(timestamp, fileId), JSON.toJSONBytes(meta));
+        db.put(buildMetaKey(timestamp, fileId), MAPPER.writeValueAsBytes(meta));
 
         // 分块保存文件内容
         try (var in = Files.newInputStream(path)) {
@@ -59,14 +60,14 @@ public class FilterableFileStore implements AutoCloseable {
     // ==========================================
     // 【核心】带过滤条件的分页查询
     // ==========================================
-    public PageResult<FileMeta> query(QueryFilter filter, int pageNo, int pageSize) {
+    public PageResult<FileMeta> query(QueryFilter filter, int pageNo, int pageSize) throws Exception {
         List<FileMeta> allMatched = new ArrayList<>();
 
         try (RocksIterator iter = db.newIterator()) {
             iter.seek(buildMetaKey(filter.startTime, 0));
 
             while (iter.isValid()) {
-                FileMeta meta = JSON.parseObject(iter.value(), FileMeta.class);
+                FileMeta meta = MAPPER.readValue(iter.value(), FileMeta.class);
 
                 // 超出时间范围直接退出
                 if (meta.timestamp > filter.endTime) break;
@@ -103,7 +104,7 @@ public class FilterableFileStore implements AutoCloseable {
     // 下载文件
     // ==========================================
     public void download(long timestamp, long fileId, String outputDir) throws Exception {
-        FileMeta meta = JSON.parseObject(db.get(buildMetaKey(timestamp, fileId)), FileMeta.class);
+        FileMeta meta = MAPPER.readValue(db.get(buildMetaKey(timestamp, fileId)), FileMeta.class);
         Path outPath = Paths.get(outputDir, meta.originalName);
         Files.createDirectories(outPath.getParent());
 
