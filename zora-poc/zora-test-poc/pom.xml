@@ -11,7 +11,7 @@
         <relativePath>../../zora-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>zora-unittest-poc</artifactId>
+    <artifactId>zora-test-poc</artifactId>
     <packaging>pom</packaging>
     <name>zora-unittest-poc - Unit Test Framework Exploration</name>
     <description>Aggregator POC module for exploring Java unit testing frameworks.

@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>top.ilovemyhome.zora</groupId>
-        <artifactId>zora-unittest-poc</artifactId>
+        <artifactId>zora-test-poc</artifactId>
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
