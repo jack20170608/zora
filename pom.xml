@@ -98,6 +98,7 @@
         <module>zora-json</module>
         <module>zora-static</module>
         <module>zora-rdb</module>
+        <module>zora-rocksdb</module>
         <module>zora-poc</module>
     </modules>
 

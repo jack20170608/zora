@@ -29,6 +29,7 @@
         <jackson.version>2.21.3</jackson.version>
         <jdbi3.version>3.53.0</jdbi3.version>
         <muserver.version>2.2.8</muserver.version>
+        <rocksdb.version>9.10.0</rocksdb.version>
     </properties>
 
     <dependencyManagement>
@@ -196,6 +197,13 @@
                 <groupId>com.h2database</groupId>
                 <artifactId>h2</artifactId>
                 <version>2.4.240</version>
+            </dependency>
+
+            <!-- RocksDB JNI bindings (embedded KV/graph store) -->
+            <dependency>
+                <groupId>org.rocksdb</groupId>
+                <artifactId>rocksdbjni</artifactId>
+                <version>${rocksdb.version}</version>
             </dependency>
 
         </dependencies>

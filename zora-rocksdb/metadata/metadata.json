@@ -1,0 +1,7 @@
+{
+  "groupId": "top.ilovemyhome",
+  "artifactId": "zora-rocksdb",
+  "description": "Embedded RocksDB utilities for zora, including a property-graph storage engine with bidirectional adjacency and order-preserving secondary indexes",
+  "version": "${revision}",
+  "scmUrl": "https://github.com/ilovemyhome/zora"
+}

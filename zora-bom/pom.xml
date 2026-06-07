@@ -82,6 +82,11 @@
                 <artifactId>zora-rdb</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-rocksdb</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
