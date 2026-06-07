@@ -675,4 +675,218 @@ class GraphStoreTest {
             assertThat(ids).hasSize(threadCount * iterPerThread);
         }
     }
+
+    // ========================== No-op short-circuit ==========================
+
+    @Test
+    void shouldKeepIndexIntactWhenAddVertexIsNoOp() throws RocksDBException {
+        // Repeated addVertex with identical properties must not corrupt the
+        // index. With the short-circuit it's literally a no-op; this test
+        // pins that behaviour so future refactors can't quietly break it.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE)
+                .withProperty("name", "Alice").withProperty("age", 30));
+
+            for (int i = 0; i < 10; i++) {
+                store.addVertex(new Vertex(1L, PERSON_TYPE)
+                    .withProperty("name", "Alice").withProperty("age", 30));
+            }
+
+            assertThat(store.getVertex(PERSON_TYPE, 1L).getProperty("name")).isEqualTo("Alice");
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "name", "Alice"))
+                .extracting(Vertex::getId).containsExactly(1L);
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "age", 30))
+                .extracting(Vertex::getId).containsExactly(1L);
+        }
+    }
+
+    @Test
+    void shouldKeepIndexIntactWhenAddEdgeIsNoOp() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
+
+            for (int i = 0; i < 10; i++) {
+                store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
+            }
+
+            assertThat(store.getEdge(1L, KNOWS_TYPE, 2L).getProperties().get("since")).isEqualTo("2020");
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020")).hasSize(1);
+            assertThat(store.findOutEdgesByProperty(1L, KNOWS_TYPE, "since", "2020"))
+                .extracting(Edge::getDstId).containsExactly(2L);
+        }
+    }
+
+    // ========================== Bulk API ==========================
+
+    @Test
+    void shouldAddVerticesInBulkAtomically() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertices(List.of(
+                new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"),
+                new Vertex(2L, PERSON_TYPE).withProperty("name", "Bob"),
+                new Vertex(3L, PERSON_TYPE).withProperty("name", "Charlie")));
+
+            for (long id = 1; id <= 3; id++) {
+                assertThat(store.getVertex(PERSON_TYPE, id)).isNotNull();
+            }
+            // Indexes also populated for every batch element.
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "name", "Bob"))
+                .extracting(Vertex::getId).containsExactly(2L);
+        }
+    }
+
+    @Test
+    void shouldAddEdgesInBulkAtomically() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertices(List.of(
+                new Vertex(1L, PERSON_TYPE),
+                new Vertex(2L, PERSON_TYPE),
+                new Vertex(3L, PERSON_TYPE)));
+
+            store.addEdges(List.of(
+                new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"),
+                new Edge(2L, 3L, KNOWS_TYPE).withProperty("since", "2021"),
+                new Edge(1L, 3L, KNOWS_TYPE).withProperty("since", "2020")));
+
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020")).hasSize(2);
+            assertThat(store.getOutEdges(1L, KNOWS_TYPE)).hasSize(2);
+        }
+    }
+
+    @Test
+    void shouldHandleEmptyBulkInputs() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertices(List.of());
+            store.addEdges(List.of());
+            // Nothing should have been touched.
+            assertThat(store.getVertex(PERSON_TYPE, 1L)).isNull();
+        }
+    }
+
+    // ========================== Partial Update ==========================
+
+    @Test
+    void shouldPartiallyUpdateVertexAndKeepUnmentionedProperties() throws RocksDBException {
+        // Headline behaviour difference vs addVertex: properties NOT in the
+        // changes map must be preserved, not wiped out.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE)
+                .withProperty("name", "Alice")
+                .withProperty("age", 30)
+                .withProperty("city", "BJ"));
+
+            boolean changed = store.updateVertexProperty(PERSON_TYPE, 1L, "age", 31);
+            assertThat(changed).isTrue();
+
+            Vertex v = store.getVertex(PERSON_TYPE, 1L);
+            assertThat(v.getProperty("name")).isEqualTo("Alice");   // preserved
+            assertThat(v.getProperty("age")).isEqualTo(31);         // updated
+            assertThat(v.getProperty("city")).isEqualTo("BJ");      // preserved
+        }
+    }
+
+    @Test
+    void shouldKeepIndexConsistentAfterPartialVertexUpdate() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE)
+                .withProperty("name", "Alice").withProperty("age", 30));
+
+            store.updateVertexProperty(PERSON_TYPE, 1L, "age", 31);
+
+            // Old age=30 entry should be gone, new age=31 should be present.
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "age", 30)).isEmpty();
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "age", 31))
+                .extracting(Vertex::getId).containsExactly(1L);
+            // Untouched property index unchanged.
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "name", "Alice"))
+                .extracting(Vertex::getId).containsExactly(1L);
+        }
+    }
+
+    @Test
+    void shouldRemovePropertyWhenUpdateValueIsNull() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE)
+                .withProperty("name", "Alice").withProperty("age", 30));
+
+            boolean changed = store.updateVertexProperty(PERSON_TYPE, 1L, "age", null);
+            assertThat(changed).isTrue();
+
+            Vertex v = store.getVertex(PERSON_TYPE, 1L);
+            assertThat(v.getProperties()).containsOnlyKeys("name");
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "age", 30)).isEmpty();
+        }
+    }
+
+    @Test
+    void shouldReturnFalseWhenUpdateMatchesCurrentState() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("age", 30));
+            // Same value -> no-op short-circuit -> false.
+            assertThat(store.updateVertexProperty(PERSON_TYPE, 1L, "age", 30)).isFalse();
+            // Deleting a missing key -> no-op -> false.
+            assertThat(store.updateVertexProperty(PERSON_TYPE, 1L, "missing", null)).isFalse();
+        }
+    }
+
+    @Test
+    void shouldReturnFalseForUpdateOnMissingVertex() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            // Vertex 999 does not exist.
+            assertThat(store.updateVertexProperty(PERSON_TYPE, 999L, "age", 1)).isFalse();
+        }
+    }
+
+    @Test
+    void shouldUpdateMultipleVertexPropertiesAtOnce() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE)
+                .withProperty("name", "Alice")
+                .withProperty("age", 30)
+                .withProperty("city", "BJ"));
+
+            // Map containing null -> use HashMap (Map.of disallows nulls).
+            java.util.HashMap<String, Object> changes = new java.util.HashMap<>();
+            changes.put("age", 31);                // update
+            changes.put("city", null);             // delete
+            changes.put("country", "CN");          // insert
+            // "name" intentionally absent -> preserved.
+
+            assertThat(store.updateVertexProperties(PERSON_TYPE, 1L, changes)).isTrue();
+
+            Vertex v = store.getVertex(PERSON_TYPE, 1L);
+            assertThat(v.getProperty("name")).isEqualTo("Alice");
+            assertThat(v.getProperty("age")).isEqualTo(31);
+            assertThat(v.getProperty("country")).isEqualTo("CN");
+            assertThat(v.getProperties()).doesNotContainKey("city");
+        }
+    }
+
+    @Test
+    void shouldPartiallyUpdateEdge() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE)
+                .withProperty("since", "2020").withProperty("weight", 5));
+
+            boolean changed = store.updateEdgeProperty(1L, KNOWS_TYPE, 2L, "weight", 10);
+            assertThat(changed).isTrue();
+
+            Edge e = store.getEdge(1L, KNOWS_TYPE, 2L);
+            assertThat(e.getProperties().get("since")).isEqualTo("2020");   // preserved
+            assertThat(e.getProperties().get("weight")).isEqualTo(10);      // updated
+
+            // All three edge index flavours must reflect the new value.
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "weight", 5)).isEmpty();
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "weight", 10)).hasSize(1);
+            assertThat(store.findOutEdgesByProperty(1L, KNOWS_TYPE, "weight", 10)).hasSize(1);
+            assertThat(store.findInEdgesByProperty(2L, KNOWS_TYPE, "weight", 10)).hasSize(1);
+        }
+    }
+
+    @Test
+    void shouldReturnFalseForUpdateOnMissingEdge() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            assertThat(store.updateEdgeProperty(1L, KNOWS_TYPE, 2L, "x", 1)).isFalse();
+        }
+    }
 }

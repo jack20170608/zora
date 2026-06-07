@@ -11,6 +11,7 @@ import top.ilovemyhome.zora.rocksdb.graph.model.Vertex;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -139,12 +140,28 @@ public class GraphTxn implements AutoCloseable {
      * Upserts a vertex, diff-updating the property index against the
      * previously committed (or pending-in-this-txn) version, and maintains
      * the vertexId -> typeId reverse index.
+     *
+     * <p>If the incoming vertex matches the persisted one byte-for-byte
+     * (same typeId, equal properties map), the call short-circuits after
+     * acquiring the row lock - no main-store write, no index churn, no
+     * JSON encode. The lock acquisition itself is still necessary, so the
+     * decision is made against the freshest committed state and cannot
+     * race with a concurrent writer.
      */
     public void addVertex(Vertex vertex) throws RocksDBException {
         ensureOpen();
         byte[] key = KeyCodec.encodeVertexKey(vertex.getTypeId(), vertex.getId());
         byte[] prevBytes = txn.getForUpdate(readOptions, store.cfVertex(), key, true);
         Vertex previous = prevBytes != null ? ValueCodec.decodeVertex(prevBytes) : null;
+
+        // Fast path: no-op when the persisted vertex already equals the
+        // incoming one. typeId equality is implied by the shared key prefix
+        // but we still check defensively.
+        if (previous != null
+                && previous.getTypeId() == vertex.getTypeId()
+                && previous.getProperties().equals(vertex.getProperties())) {
+            return;
+        }
 
         txn.put(store.cfVertex(), key, ValueCodec.encodeVertex(vertex));
 
@@ -163,7 +180,8 @@ public class GraphTxn implements AutoCloseable {
             Map<String, Object> newProps = vertex.getProperties();
             for (Map.Entry<String, Object> entry : previous.getProperties().entrySet()) {
                 Object newValue = newProps.get(entry.getKey());
-                if (!Objects.equals(newValue, entry.getValue())) {
+                if (!Objects.equals(newValue, entry.getValue())
+                        && store.indexPolicy().shouldIndexVertexProperty(vertex.getTypeId(), entry.getKey())) {
                     int propId = resolvePropId(entry.getKey());
                     txn.delete(store.cfIndex(),
                         buildVertexIndexKey(vertex.getTypeId(), propId, entry.getValue(), vertex.getId()));
@@ -175,7 +193,8 @@ public class GraphTxn implements AutoCloseable {
         Map<String, Object> oldProps = previous == null ? Map.of() : previous.getProperties();
         for (Map.Entry<String, Object> entry : vertex.getProperties().entrySet()) {
             Object oldValue = oldProps.get(entry.getKey());
-            if (!Objects.equals(oldValue, entry.getValue())) {
+            if (!Objects.equals(oldValue, entry.getValue())
+                    && store.indexPolicy().shouldIndexVertexProperty(vertex.getTypeId(), entry.getKey())) {
                 int propId = resolvePropId(entry.getKey());
                 txn.put(store.cfIndex(),
                     buildVertexIndexKey(vertex.getTypeId(), propId, entry.getValue(), vertex.getId()),
@@ -213,6 +232,7 @@ public class GraphTxn implements AutoCloseable {
 
         if (vertex != null) {
             for (Map.Entry<String, Object> entry : vertex.getProperties().entrySet()) {
+                if (!store.indexPolicy().shouldIndexVertexProperty(typeId, entry.getKey())) continue;
                 int propId = resolvePropId(entry.getKey());
                 txn.delete(store.cfIndex(),
                     buildVertexIndexKey(typeId, propId, entry.getValue(), vertexId));
@@ -238,6 +258,11 @@ public class GraphTxn implements AutoCloseable {
     /**
      * Upserts an edge. Writes both directional adjacency keys and 3-way
      * property index entries, diff-ing against the previous version.
+     *
+     * <p>Short-circuits to a no-op if the incoming edge matches the
+     * persisted one (same properties) - row locks on both directional keys
+     * are still acquired so the decision races safely with concurrent
+     * writers.
      */
     public void addEdge(Edge edge) throws RocksDBException {
         ensureOpen();
@@ -247,6 +272,12 @@ public class GraphTxn implements AutoCloseable {
         byte[] prevBytes = txn.getForUpdate(readOptions, store.cfEdge(), outKey, true);
         txn.getForUpdate(readOptions, store.cfEdge(), inKey, true);
         Edge previous = prevBytes != null ? ValueCodec.decodeEdge(prevBytes) : null;
+
+        // Fast path: persisted edge is byte-equal to the incoming one.
+        // srcId/dstId/typeId equality is implied by the shared keys.
+        if (previous != null && previous.getProperties().equals(edge.getProperties())) {
+            return;
+        }
 
         byte[] value = ValueCodec.encodeEdge(edge);
         txn.put(store.cfEdge(), outKey, value);
@@ -289,6 +320,186 @@ public class GraphTxn implements AutoCloseable {
             deleteEdgeIndexEntries(existing);
         }
     }
+
+    // ========================== Partial Update ==========================
+    //
+    // The partial-update family lets the caller change only the named
+    // properties of an existing vertex/edge instead of submitting a full
+    // replacement object. The differences vs addVertex/addEdge:
+    //
+    //   - Properties NOT mentioned in `changes` are preserved as-is.
+    //     (addVertex would have overwritten the whole map.)
+    //   - A property whose new value is `null` is removed from the entity
+    //     and its index entries are deleted.
+    //   - Returns false (and writes nothing) if the entity does not exist
+    //     OR if every requested change matches the current state.
+    //
+    // The optimization wins are: caller no longer constructs a full Vertex,
+    // and the diff loop iterates the (small) changes map instead of the
+    // (potentially large) entire properties map. The single main-store JSON
+    // encode/decode pair is still paid because the persistent layout is one
+    // JSON value per entity.
+
+    /**
+     * Convenience: update a single property of an existing vertex.
+     *
+     * @return true if the vertex existed and the value actually changed.
+     */
+    public boolean updateVertexProperty(int typeId, long vertexId,
+                                        String propName, Object newValue) throws RocksDBException {
+        return updateVertexProperties(typeId, vertexId, Map.of(propName, wrapNullable(newValue)));
+    }
+
+    /**
+     * Partial-update a vertex: apply only the keys present in {@code changes}.
+     * A {@code null} value removes the property; missing keys are untouched.
+     *
+     * @return true iff the vertex existed and at least one property changed.
+     */
+    public boolean updateVertexProperties(int typeId, long vertexId,
+                                          Map<String, Object> changes) throws RocksDBException {
+        ensureOpen();
+        if (changes.isEmpty()) return false;
+
+        byte[] key = KeyCodec.encodeVertexKey(typeId, vertexId);
+        byte[] prevBytes = txn.getForUpdate(readOptions, store.cfVertex(), key, true);
+        if (prevBytes == null) return false;
+        Vertex previous = ValueCodec.decodeVertex(prevBytes);
+
+        // Walk only the changes map; skip work for keys whose value already matches.
+        Map<String, Object> oldProps = previous.getProperties();
+        Map<String, Object> newProps = null;   // copy-on-first-write
+        boolean anyChanged = false;
+
+        for (Map.Entry<String, Object> entry : changes.entrySet()) {
+            String name = entry.getKey();
+            Object incoming = unwrapNullable(entry.getValue());
+            Object current = oldProps.get(name);
+            boolean wasPresent = oldProps.containsKey(name);
+
+            // Equality check honours both "value unchanged" and "delete-but-missing".
+            if (incoming == null) {
+                if (!wasPresent) continue;
+            } else if (incoming.equals(current)) {
+                continue;
+            }
+
+            // First real change: materialise the mutable working copy.
+            if (newProps == null) newProps = new HashMap<>(oldProps);
+
+            boolean indexed = store.indexPolicy().shouldIndexVertexProperty(typeId, name);
+            int propId = indexed ? resolvePropId(name) : -1;
+            // Drop the old index entry (if there was an old value AND it was indexed).
+            if (wasPresent && indexed) {
+                txn.delete(store.cfIndex(),
+                    buildVertexIndexKey(typeId, propId, current, vertexId));
+            }
+            if (incoming == null) {
+                newProps.remove(name);
+            } else {
+                newProps.put(name, incoming);
+                if (indexed) {
+                    txn.put(store.cfIndex(),
+                        buildVertexIndexKey(typeId, propId, incoming, vertexId),
+                        EMPTY_VALUE);
+                }
+            }
+            anyChanged = true;
+        }
+
+        if (!anyChanged) return false;
+
+        // Persist the new full JSON. Cannot avoid this with the current
+        // one-JSON-per-vertex layout - see class doc.
+        Vertex merged = new Vertex(vertexId, typeId, newProps);
+        txn.put(store.cfVertex(), key, ValueCodec.encodeVertex(merged));
+        return true;
+    }
+
+    /**
+     * Convenience: update a single property of an existing edge.
+     *
+     * @return true if the edge existed and the value actually changed.
+     */
+    public boolean updateEdgeProperty(long srcId, int edgeType, long dstId,
+                                      String propName, Object newValue) throws RocksDBException {
+        return updateEdgeProperties(srcId, edgeType, dstId,
+            Map.of(propName, wrapNullable(newValue)));
+    }
+
+    /**
+     * Partial-update an edge. Same semantics as
+     * {@link #updateVertexProperties(int, long, Map)} but applied to both
+     * directional adjacency rows and to all three edge-index flavours.
+     */
+    public boolean updateEdgeProperties(long srcId, int edgeType, long dstId,
+                                        Map<String, Object> changes) throws RocksDBException {
+        ensureOpen();
+        if (changes.isEmpty()) return false;
+
+        byte[] outKey = KeyCodec.encodeOutEdgeKey(srcId, edgeType, dstId);
+        byte[] inKey  = KeyCodec.encodeInEdgeKey (dstId, edgeType, srcId);
+
+        byte[] prevBytes = txn.getForUpdate(readOptions, store.cfEdge(), outKey, true);
+        txn.getForUpdate(readOptions, store.cfEdge(), inKey, true);
+        if (prevBytes == null) return false;
+        Edge previous = ValueCodec.decodeEdge(prevBytes);
+
+        Map<String, Object> oldProps = previous.getProperties();
+        Map<String, Object> newProps = null;
+        boolean anyChanged = false;
+
+        for (Map.Entry<String, Object> entry : changes.entrySet()) {
+            String name = entry.getKey();
+            Object incoming = unwrapNullable(entry.getValue());
+            Object current = oldProps.get(name);
+            boolean wasPresent = oldProps.containsKey(name);
+
+            if (incoming == null) {
+                if (!wasPresent) continue;
+            } else if (incoming.equals(current)) {
+                continue;
+            }
+
+            if (newProps == null) newProps = new HashMap<>(oldProps);
+
+            if (wasPresent) {
+                deleteEdgeIndexForProperty(previous, name, current);
+            }
+            if (incoming == null) {
+                newProps.remove(name);
+            } else {
+                newProps.put(name, incoming);
+                // Build a temporary edge holder just to feed the helper; only
+                // src/dst/type are read off it, so we don't materialise props.
+                putEdgeIndexForProperty(previous, name, incoming);
+            }
+            anyChanged = true;
+        }
+
+        if (!anyChanged) return false;
+
+        Edge merged = new Edge(srcId, dstId, edgeType, newProps);
+        byte[] value = ValueCodec.encodeEdge(merged);
+        txn.put(store.cfEdge(), outKey, value);
+        txn.put(store.cfEdge(), inKey,  value);
+        return true;
+    }
+
+    /**
+     * Allows {@code Map.of(name, null)} for single-property delete despite
+     * Map.of() disallowing null values. Callers internally wrap null in a
+     * private sentinel and {@link #unwrapNullable} reverses it.
+     */
+    private static Object wrapNullable(Object value) {
+        return value == null ? NULL_SENTINEL : value;
+    }
+
+    private static Object unwrapNullable(Object value) {
+        return value == NULL_SENTINEL ? null : value;
+    }
+
+    private static final Object NULL_SENTINEL = new Object();
 
     // ========================== Counter ==========================
 
@@ -351,6 +562,7 @@ public class GraphTxn implements AutoCloseable {
     // ========================== Edge Index Helpers ==========================
 
     private void putEdgeIndexForProperty(Edge edge, String propName, Object value) throws RocksDBException {
+        if (!store.indexPolicy().shouldIndexEdgeProperty(edge.getTypeId(), propName)) return;
         int propId = resolvePropId(propName);
         byte[] encVal = Property.encodeValue(value);
         long srcId = edge.getSrcId();
@@ -366,6 +578,7 @@ public class GraphTxn implements AutoCloseable {
     }
 
     private void deleteEdgeIndexForProperty(Edge edge, String propName, Object value) throws RocksDBException {
+        if (!store.indexPolicy().shouldIndexEdgeProperty(edge.getTypeId(), propName)) return;
         int propId = resolvePropId(propName);
         byte[] encVal = Property.encodeValue(value);
         long srcId = edge.getSrcId();

@@ -17,6 +17,10 @@ package top.ilovemyhome.zora.rocksdb.graph.store;
  *   <li>{@code syncWrites        = false} - writes are durable after a
  *       crash via RocksDB's WAL; {@code sync=true} additionally fsyncs on
  *       every commit (~order of magnitude slower).</li>
+ *   <li>{@code indexPolicy       = IndexPolicy.none()} - no secondary
+ *       indexing by default; callers must declare which
+ *       {@code (typeId, propName)} pairs are queryable via
+ *       {@link IndexPolicy#builder()}.</li>
  * </ul>
  */
 public final class GraphStoreOptions {
@@ -26,11 +30,13 @@ public final class GraphStoreOptions {
     private final long lockTimeoutMillis;
     private final boolean deadlockDetect;
     private final boolean syncWrites;
+    private final IndexPolicy indexPolicy;
 
     private GraphStoreOptions(Builder b) {
         this.lockTimeoutMillis = b.lockTimeoutMillis;
         this.deadlockDetect    = b.deadlockDetect;
         this.syncWrites        = b.syncWrites;
+        this.indexPolicy       = b.indexPolicy;
     }
 
     /** Convenience: a shared instance carrying the default settings. */
@@ -45,11 +51,13 @@ public final class GraphStoreOptions {
     public long lockTimeoutMillis() { return lockTimeoutMillis; }
     public boolean deadlockDetect() { return deadlockDetect; }
     public boolean syncWrites()     { return syncWrites; }
+    public IndexPolicy indexPolicy() { return indexPolicy; }
 
     public static final class Builder {
         private long lockTimeoutMillis = 1000;
         private boolean deadlockDetect = true;
         private boolean syncWrites     = false;
+        private IndexPolicy indexPolicy = IndexPolicy.none();
 
         /**
          * Maximum time (in ms) a transaction will wait for a row lock before
@@ -81,6 +89,18 @@ public final class GraphStoreOptions {
          */
         public Builder syncWrites(boolean on) {
             this.syncWrites = on;
+            return this;
+        }
+
+        /**
+         * Sets which (typeId, propertyName) pairs the store should maintain
+         * secondary indexes for. Default is {@link IndexPolicy#none()} -
+         * nothing is indexed unless the caller explicitly opts in via
+         * {@link IndexPolicy#builder()}. See {@link IndexPolicy} for the
+         * implications on read / write paths.
+         */
+        public Builder indexPolicy(IndexPolicy policy) {
+            this.indexPolicy = policy == null ? IndexPolicy.none() : policy;
             return this;
         }
 

@@ -2,6 +2,7 @@ package top.ilovemyhome.zora.rocksdb.graph.codec;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import top.ilovemyhome.zora.rocksdb.graph.model.Edge;
 import top.ilovemyhome.zora.rocksdb.graph.model.Vertex;
 
@@ -9,12 +10,24 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * JSON codec for graph entity values using Jackson.
- * Production environments may replace this with Protobuf or FlatBuffers for better performance.
+ * Binary codec for graph entity values using Jackson Smile.
+ *
+ * <p>Smile is a binary superset of JSON (same data model, same Jackson
+ * databind layer, same POJOs) but encoded as a compact tag-prefixed binary
+ * stream. Compared to plain JSON it cuts both encode and decode time
+ * roughly in half, with no API-level change for callers - the bytes
+ * written into cf_vertex / cf_edge are simply binary instead of UTF-8
+ * JSON text.
+ *
+ * <p><b>Backwards compatibility:</b> Smile-encoded blobs start with a
+ * 4-byte magic header {@code 3A 29 0A ...}; plain JSON starts with
+ * {@code '{'} (0x7B). They are not mutually readable. Existing JSON-format
+ * databases must be re-imported or this class must be reverted before
+ * opening them.
  */
 public final class ValueCodec {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper(new SmileFactory());
 
     private ValueCodec() {
         // utility class
