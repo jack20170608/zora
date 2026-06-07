@@ -1,5 +1,6 @@
 package top.ilovemyhome.zora.rocksdb.graph.store;
 
+import static top.ilovemyhome.zora.rocksdb.graph.store.TestSupport.openTestStore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,7 +42,7 @@ class AddVertexUpdateBenchmarkTest {
      */
     @Test
     void benchmarkSingleVertexRepeatedUpdate() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
 
             int iterations = 10_000;
@@ -65,7 +66,7 @@ class AddVertexUpdateBenchmarkTest {
      */
     @Test
     void benchmarkWideVertexUpdate() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             Map<String, Object> base = new HashMap<>();
             for (int i = 0; i < 50; i++) {
                 base.put("prop_" + i, "value_" + i);
@@ -95,7 +96,7 @@ class AddVertexUpdateBenchmarkTest {
      */
     @Test
     void benchmarkNoOpUpdateShortCircuit() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             Vertex same = new Vertex(1L, PERSON_TYPE)
                 .withProperty("name", "Alice")
                 .withProperty("age", 30);
@@ -127,7 +128,7 @@ class AddVertexUpdateBenchmarkTest {
         int[] batchSizes = {1, 100, 1000, 5000};
 
         for (int batchSize : batchSizes) {
-            try (GraphStore store = new GraphStore(tempDir.resolve("b" + batchSize).toString())) {
+            try (GraphStore store = openTestStore(tempDir.resolve("b" + batchSize).toString())) {
                 long start = System.nanoTime();
                 long nextId = 1;
                 for (int written = 0; written < total; written += batchSize) {
@@ -164,7 +165,7 @@ class AddVertexUpdateBenchmarkTest {
         int iterations = 10_000;
 
         // --- Variant A: full addVertex ---
-        try (GraphStore store = new GraphStore(tempDir.resolve("full").toString())) {
+        try (GraphStore store = openTestStore(tempDir.resolve("full").toString())) {
             Map<String, Object> base = new HashMap<>();
             for (int i = 0; i < 50; i++) base.put("prop_" + i, "value_" + i);
             store.addVertex(new Vertex(1L, PERSON_TYPE, base));
@@ -181,7 +182,7 @@ class AddVertexUpdateBenchmarkTest {
         }
 
         // --- Variant B: updateVertexProperty ---
-        try (GraphStore store = new GraphStore(tempDir.resolve("partial").toString())) {
+        try (GraphStore store = openTestStore(tempDir.resolve("partial").toString())) {
             Map<String, Object> base = new HashMap<>();
             for (int i = 0; i < 50; i++) base.put("prop_" + i, "value_" + i);
             store.addVertex(new Vertex(1L, PERSON_TYPE, base));

@@ -1,5 +1,6 @@
 package top.ilovemyhome.zora.rocksdb.graph.store;
 
+import static top.ilovemyhome.zora.rocksdb.graph.store.TestSupport.openTestStore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,7 +36,7 @@ class ParallelImportBenchmarkTest {
         LOG.info("Machine has {} available processors", cores);
 
         for (int workers : workerCounts) {
-            try (GraphStore store = new GraphStore(tempDir.resolve("w" + workers).toString())) {
+            try (GraphStore store = openTestStore(tempDir.resolve("w" + workers).toString())) {
                 long start = System.nanoTime();
                 try (var importer = ParallelGraphImporter.vertexImporter(store, workers, BATCH)) {
                     for (long id = 1; id <= TOTAL; id++) {

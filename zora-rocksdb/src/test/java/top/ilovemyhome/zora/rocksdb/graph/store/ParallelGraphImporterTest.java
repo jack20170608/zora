@@ -1,5 +1,6 @@
 package top.ilovemyhome.zora.rocksdb.graph.store;
 
+import static top.ilovemyhome.zora.rocksdb.graph.store.TestSupport.openTestStore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -28,7 +29,7 @@ class ParallelGraphImporterTest {
 
     @Test
     void shouldImportAllVerticesAcrossWorkers() throws Exception {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             int count = 1_000;
             try (var importer = ParallelGraphImporter.vertexImporter(store, 4, 50)) {
                 for (long id = 1; id <= count; id++) {
@@ -44,7 +45,7 @@ class ParallelGraphImporterTest {
 
     @Test
     void shouldImportAllEdgesAcrossWorkers() throws Exception {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             // Pre-create endpoint vertices.
             try (var v = ParallelGraphImporter.vertexImporter(store, 4, 100)) {
                 for (long id = 1; id <= 100; id++) {
@@ -70,7 +71,7 @@ class ParallelGraphImporterTest {
         // Submitting the same vertex id twice with conflicting properties
         // must serialise on the same worker (so the second one wins
         // deterministically) - never race two workers on the same row.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (var importer = ParallelGraphImporter.vertexImporter(store, 8, 1)) {
                 for (int i = 0; i < 100; i++) {
                     importer.submit(new Vertex(42L, PERSON_TYPE)
@@ -86,7 +87,7 @@ class ParallelGraphImporterTest {
 
     @Test
     void shouldHandleEmptySubmissions() throws Exception {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (var importer = ParallelGraphImporter.vertexImporter(store, 4, 50)) {
                 // Nothing submitted.
             }
@@ -99,7 +100,7 @@ class ParallelGraphImporterTest {
         // Submit an item type the codec can't handle to force a failure.
         // Submitting null forces NPE deep in the write path which is
         // caught and propagated as ImportException on close.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             var importer = ParallelGraphImporter.vertexImporter(store, 2, 5);
             // Use a property type the encoder rejects: an unsupported class.
             importer.submit(new Vertex(1L, PERSON_TYPE).withProperty("bad", new Object()));
@@ -114,7 +115,7 @@ class ParallelGraphImporterTest {
 
     @Test
     void shouldRejectSubmitAfterClose() throws Exception {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             var importer = ParallelGraphImporter.vertexImporter(store, 2, 5);
             importer.close();
             assertThatThrownBy(() -> importer.submit(new Vertex(1L, PERSON_TYPE)))

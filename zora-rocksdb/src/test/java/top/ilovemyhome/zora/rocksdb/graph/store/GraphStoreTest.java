@@ -1,5 +1,6 @@
 package top.ilovemyhome.zora.rocksdb.graph.store;
 
+import static top.ilovemyhome.zora.rocksdb.graph.store.TestSupport.openTestStore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,7 +38,7 @@ class GraphStoreTest {
 
     @Test
     void shouldAddAndGetVertex() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             Vertex alice = new Vertex(1001L, PERSON_TYPE)
                 .withProperty("name", "Alice")
                 .withProperty("age", 30);
@@ -55,7 +56,7 @@ class GraphStoreTest {
 
     @Test
     void shouldUpdateVertexProperties() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             Vertex v1 = new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice");
             store.addVertex(v1);
 
@@ -72,7 +73,7 @@ class GraphStoreTest {
 
     @Test
     void shouldCleanUpStaleIndexEntriesOnUpdate() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             // First version of the vertex; "Alice" gets indexed.
             store.addVertex(new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice"));
             assertThat(store.findVerticesByProperty(PERSON_TYPE, "name", "Alice")).hasSize(1);
@@ -86,7 +87,7 @@ class GraphStoreTest {
 
     @Test
     void shouldRemoveVertex() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             Vertex alice = new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice");
             store.addVertex(alice);
 
@@ -100,7 +101,7 @@ class GraphStoreTest {
 
     @Test
     void shouldGenerateSequentialVertexIds() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             long id1 = store.nextVertexId();
             long id2 = store.nextVertexId();
             long id3 = store.nextVertexId();
@@ -114,7 +115,7 @@ class GraphStoreTest {
 
     @Test
     void shouldAddAndGetEdge() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             Edge edge = new Edge(1001L, 1002L, KNOWS_TYPE).withProperty("since", "2020");
             store.addEdge(edge);
 
@@ -129,7 +130,7 @@ class GraphStoreTest {
 
     @Test
     void shouldStoreBidirectionalEdges() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addVertex(new Vertex(1002L, PERSON_TYPE).withProperty("name", "Bob"));
 
@@ -147,7 +148,7 @@ class GraphStoreTest {
 
     @Test
     void shouldRemoveBidirectionalEdges() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1001L, 1002L, KNOWS_TYPE));
             store.removeEdge(1001L, KNOWS_TYPE, 1002L);
 
@@ -159,7 +160,7 @@ class GraphStoreTest {
 
     @Test
     void shouldSupportMultipleEdgeTypes() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1001L, 1002L, KNOWS_TYPE));
             store.addEdge(new Edge(1001L, 1002L, FOLLOWS_TYPE));
 
@@ -170,7 +171,7 @@ class GraphStoreTest {
 
     @Test
     void shouldSupportMultipleNeighbors() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addVertex(new Vertex(1002L, PERSON_TYPE).withProperty("name", "Bob"));
             store.addVertex(new Vertex(1003L, PERSON_TYPE).withProperty("name", "Charlie"));
@@ -192,7 +193,7 @@ class GraphStoreTest {
 
     @Test
     void shouldRemoveVertexAndAllEdges() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addVertex(new Vertex(1002L, PERSON_TYPE).withProperty("name", "Bob"));
             store.addVertex(new Vertex(1003L, PERSON_TYPE).withProperty("name", "Charlie"));
@@ -214,7 +215,7 @@ class GraphStoreTest {
 
     @Test
     void shouldFindVerticesByStringProperty() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addVertex(new Vertex(1002L, PERSON_TYPE).withProperty("name", "Bob"));
             store.addVertex(new Vertex(1003L, PERSON_TYPE).withProperty("name", "Alice"));
@@ -229,7 +230,7 @@ class GraphStoreTest {
     void shouldNotMatchByStringPrefix() throws RocksDBException {
         // Regression: with the self-terminating string encoding, "Alic"
         // must not match a vertex whose name is "Alice".
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addVertex(new Vertex(1002L, PERSON_TYPE).withProperty("name", "Alicia"));
 
@@ -241,7 +242,7 @@ class GraphStoreTest {
 
     @Test
     void shouldFindVerticesByIntegerProperty() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1001L, PERSON_TYPE).withProperty("age", 25));
             store.addVertex(new Vertex(1002L, PERSON_TYPE).withProperty("age", 30));
             store.addVertex(new Vertex(1003L, PERSON_TYPE).withProperty("age", 25));
@@ -254,7 +255,7 @@ class GraphStoreTest {
 
     @Test
     void shouldReturnEmptyForMissingProperty() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1001L, PERSON_TYPE).withProperty("name", "Alice"));
 
             assertThat(store.findVerticesByProperty(PERSON_TYPE, "name", "Bob")).isEmpty();
@@ -265,7 +266,7 @@ class GraphStoreTest {
 
     @Test
     void shouldFindVerticesByIntegerRange() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("age", 20));
             store.addVertex(new Vertex(2L, PERSON_TYPE).withProperty("age", 25));
             store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("age", 30));
@@ -285,7 +286,7 @@ class GraphStoreTest {
     @Test
     void shouldHandleNegativeNumbersInRange() throws RocksDBException {
         // Sign-bit-flip encoding has to keep negative numbers ordered too.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("balance", -100));
             store.addVertex(new Vertex(2L, PERSON_TYPE).withProperty("balance", -10));
             store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("balance", 0));
@@ -299,7 +300,7 @@ class GraphStoreTest {
 
     @Test
     void shouldFindVerticesByDoubleRange() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("score", 1.5));
             store.addVertex(new Vertex(2L, PERSON_TYPE).withProperty("score", 2.7));
             store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("score", 3.14));
@@ -313,7 +314,7 @@ class GraphStoreTest {
 
     @Test
     void shouldFindVerticesByStringRange() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addVertex(new Vertex(2L, PERSON_TYPE).withProperty("name", "Bob"));
             store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("name", "Charlie"));
@@ -329,11 +330,11 @@ class GraphStoreTest {
 
     @Test
     void shouldPersistPropertyDictionaryAcrossReopens() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
         }
         // Reopen and verify the index still resolves "name" -> the same propId.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             assertThat(store.findVerticesByProperty(PERSON_TYPE, "name", "Alice"))
                 .extracting(Vertex::getId).containsExactly(1L);
         }
@@ -343,7 +344,7 @@ class GraphStoreTest {
 
     @Test
     void shouldHandleSocialGraphScenario() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice").withProperty("age", 30));
             store.addVertex(new Vertex(2L, PERSON_TYPE).withProperty("name", "Bob").withProperty("age", 25));
             store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("name", "Charlie").withProperty("age", 35));
@@ -383,7 +384,7 @@ class GraphStoreTest {
 
     @Test
     void shouldFindEdgesByPropertyGlobally() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
             store.addEdge(new Edge(1L, 3L, KNOWS_TYPE).withProperty("since", "2021"));
             store.addEdge(new Edge(2L, 3L, KNOWS_TYPE).withProperty("since", "2020"));
@@ -400,7 +401,7 @@ class GraphStoreTest {
 
     @Test
     void shouldFindEdgesByIntegerPropertyRange() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("weight", 1));
             store.addEdge(new Edge(1L, 3L, KNOWS_TYPE).withProperty("weight", 5));
             store.addEdge(new Edge(2L, 3L, KNOWS_TYPE).withProperty("weight", 10));
@@ -417,7 +418,7 @@ class GraphStoreTest {
     void shouldFindOutAndInEdgesByProperty() throws RocksDBException {
         // Endpoint-keyed flavour: filter Alice's OUT edges by since=2020 without
         // intersecting two separate scans in user code.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
             store.addEdge(new Edge(1L, 3L, KNOWS_TYPE).withProperty("since", "2021"));
             store.addEdge(new Edge(1L, 4L, KNOWS_TYPE).withProperty("since", "2020"));
@@ -437,7 +438,7 @@ class GraphStoreTest {
         // addEdge re-runs as an upsert; the previous "since=2020" index entries
         // (all three flavours) must disappear when we rewrite the same edge
         // with "since=2099".
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
             assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020")).hasSize(1);
 
@@ -452,7 +453,7 @@ class GraphStoreTest {
 
     @Test
     void shouldCleanUpEdgeIndexOnRemoveEdge() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
             store.removeEdge(1L, KNOWS_TYPE, 2L);
 
@@ -467,7 +468,7 @@ class GraphStoreTest {
         // Deleting a vertex must cascade-delete every incident edge AND each
         // edge's 3-way index entries; otherwise findEdgesByProperty returns
         // ghost edges that the user can't even resolve to a real Edge.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addVertex(new Vertex(2L, PERSON_TYPE).withProperty("name", "Bob"));
             store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("name", "Charlie"));
@@ -485,7 +486,7 @@ class GraphStoreTest {
     void shouldShareSchemaDictionaryAcrossVertexAndEdge() throws RocksDBException {
         // Single propId namespace - resolving "name" via addVertex must be the
         // same id later used by edge indexing for the property "name".
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("name", "best-friend"));
 
@@ -500,10 +501,10 @@ class GraphStoreTest {
 
     @Test
     void shouldPersistEdgeIndexAcrossReopens() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
         }
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020"))
                 .extracting(e -> e.getSrcId() + "->" + e.getDstId())
                 .containsExactly("1->2");
@@ -513,7 +514,7 @@ class GraphStoreTest {
     @Test
     void shouldFindOutEdgesByPropertyRange() throws RocksDBException {
         // Endpoint + range filter without any user-side intersection.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("weight", 1));
             store.addEdge(new Edge(1L, 3L, KNOWS_TYPE).withProperty("weight", 5));
             store.addEdge(new Edge(1L, 4L, KNOWS_TYPE).withProperty("weight", 10));
@@ -534,7 +535,7 @@ class GraphStoreTest {
     @Test
     void shouldFindInEdgesByPropertyRange() throws RocksDBException {
         // Same shape, dst-keyed flavour.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(2L, 1L, KNOWS_TYPE).withProperty("weight", 1));
             store.addEdge(new Edge(3L, 1L, KNOWS_TYPE).withProperty("weight", 5));
             store.addEdge(new Edge(4L, 1L, KNOWS_TYPE).withProperty("weight", 10));
@@ -551,7 +552,7 @@ class GraphStoreTest {
     void shouldResolveVertexByIdAcrossMultipleTypes() throws RocksDBException {
         // The reverse index makes getVertex(long) a point lookup regardless
         // of typeId. This used to silently rely on a full cf_vertex scan.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
             store.addVertex(new Vertex(2L, PERSON_TYPE + 5).withProperty("name", "Acme Corp"));
             store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("name", "Bob"));
@@ -568,7 +569,7 @@ class GraphStoreTest {
         // After removeVertex, the reverse entry must also be gone so
         // getVertex(long) returns null without ever fall-backing to a scan
         // (which would have also returned null but slower).
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
             assertThat(store.getVertex(1L)).isNotNull();
             store.removeVertex(PERSON_TYPE, 1L);
@@ -593,7 +594,7 @@ class GraphStoreTest {
         // findVerticesByProperty must return the vertex exactly when the
         // vertex's persisted "city" property matches the query - never
         // returning a ghost match, never missing a real one.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("city", "BJ"));
 
             String[] cities = {"BJ", "SH", "SZ", "HZ", "GZ"};
@@ -647,7 +648,7 @@ class GraphStoreTest {
     void shouldGenerateUniqueIdsUnderContention() throws Exception {
         // nextVertexId() runs as its own mini-txn; verify two threads never
         // get the same number back even when racing tightly.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             int threadCount = 8;
             int iterPerThread = 200;
             java.util.concurrent.ExecutorService pool =
@@ -683,7 +684,7 @@ class GraphStoreTest {
         // Repeated addVertex with identical properties must not corrupt the
         // index. With the short-circuit it's literally a no-op; this test
         // pins that behaviour so future refactors can't quietly break it.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE)
                 .withProperty("name", "Alice").withProperty("age", 30));
 
@@ -702,7 +703,7 @@ class GraphStoreTest {
 
     @Test
     void shouldKeepIndexIntactWhenAddEdgeIsNoOp() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
 
             for (int i = 0; i < 10; i++) {
@@ -720,7 +721,7 @@ class GraphStoreTest {
 
     @Test
     void shouldAddVerticesInBulkAtomically() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertices(List.of(
                 new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"),
                 new Vertex(2L, PERSON_TYPE).withProperty("name", "Bob"),
@@ -737,7 +738,7 @@ class GraphStoreTest {
 
     @Test
     void shouldAddEdgesInBulkAtomically() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertices(List.of(
                 new Vertex(1L, PERSON_TYPE),
                 new Vertex(2L, PERSON_TYPE),
@@ -755,7 +756,7 @@ class GraphStoreTest {
 
     @Test
     void shouldHandleEmptyBulkInputs() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertices(List.of());
             store.addEdges(List.of());
             // Nothing should have been touched.
@@ -769,7 +770,7 @@ class GraphStoreTest {
     void shouldPartiallyUpdateVertexAndKeepUnmentionedProperties() throws RocksDBException {
         // Headline behaviour difference vs addVertex: properties NOT in the
         // changes map must be preserved, not wiped out.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE)
                 .withProperty("name", "Alice")
                 .withProperty("age", 30)
@@ -787,7 +788,7 @@ class GraphStoreTest {
 
     @Test
     void shouldKeepIndexConsistentAfterPartialVertexUpdate() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE)
                 .withProperty("name", "Alice").withProperty("age", 30));
 
@@ -805,7 +806,7 @@ class GraphStoreTest {
 
     @Test
     void shouldRemovePropertyWhenUpdateValueIsNull() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE)
                 .withProperty("name", "Alice").withProperty("age", 30));
 
@@ -820,7 +821,7 @@ class GraphStoreTest {
 
     @Test
     void shouldReturnFalseWhenUpdateMatchesCurrentState() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("age", 30));
             // Same value -> no-op short-circuit -> false.
             assertThat(store.updateVertexProperty(PERSON_TYPE, 1L, "age", 30)).isFalse();
@@ -831,7 +832,7 @@ class GraphStoreTest {
 
     @Test
     void shouldReturnFalseForUpdateOnMissingVertex() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             // Vertex 999 does not exist.
             assertThat(store.updateVertexProperty(PERSON_TYPE, 999L, "age", 1)).isFalse();
         }
@@ -839,7 +840,7 @@ class GraphStoreTest {
 
     @Test
     void shouldUpdateMultipleVertexPropertiesAtOnce() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE)
                 .withProperty("name", "Alice")
                 .withProperty("age", 30)
@@ -864,7 +865,7 @@ class GraphStoreTest {
 
     @Test
     void shouldPartiallyUpdateEdge() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addEdge(new Edge(1L, 2L, KNOWS_TYPE)
                 .withProperty("since", "2020").withProperty("weight", 5));
 
@@ -885,7 +886,7 @@ class GraphStoreTest {
 
     @Test
     void shouldReturnFalseForUpdateOnMissingEdge() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             assertThat(store.updateEdgeProperty(1L, KNOWS_TYPE, 2L, "x", 1)).isFalse();
         }
     }

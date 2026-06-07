@@ -1,5 +1,6 @@
 package top.ilovemyhome.zora.rocksdb.graph.store;
 
+import static top.ilovemyhome.zora.rocksdb.graph.store.TestSupport.openTestStore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,7 +45,7 @@ class GraphStoreBenchmarkTest {
 
     @Test
     void benchmarkVertexWriteThroughput() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             int count = 10_000;
 
             long start = System.nanoTime();
@@ -68,7 +69,7 @@ class GraphStoreBenchmarkTest {
 
     @Test
     void benchmarkEdgeWriteThroughput() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             // Pre-create vertices
             long[] vertexIds = new long[WARMUP_VERTICES];
             for (int i = 0; i < WARMUP_VERTICES; i++) {
@@ -95,7 +96,7 @@ class GraphStoreBenchmarkTest {
 
     @Test
     void benchmarkNeighborTraversalScaling() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             for (int neighborCount : NEIGHBOR_COUNTS) {
                 // Setup: one hub vertex connected to N neighbors
                 long hubId = store.nextVertexId();
@@ -135,7 +136,7 @@ class GraphStoreBenchmarkTest {
 
     @Test
     void benchmarkInEdgeTraversal() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             // Setup: N vertices all point to one central vertex
             long centerId = store.nextVertexId();
             store.addVertex(new Vertex(centerId, PERSON_TYPE));
@@ -162,7 +163,7 @@ class GraphStoreBenchmarkTest {
 
     @Test
     void benchmarkPropertyIndexQuery() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             // Create vertices with indexed properties
             int totalVertices = 5000;
             String targetName = "TargetUser";
@@ -191,7 +192,7 @@ class GraphStoreBenchmarkTest {
 
     @Test
     void benchmarkMixedWorkload() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             int vertexCount = 1000;
             int edgePerVertex = 10;
 
@@ -252,7 +253,7 @@ class GraphStoreBenchmarkTest {
 
     @Test
     void benchmarkVertexDeletionWithEdges() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             long vertexId = store.nextVertexId();
             store.addVertex(new Vertex(vertexId, PERSON_TYPE));
 

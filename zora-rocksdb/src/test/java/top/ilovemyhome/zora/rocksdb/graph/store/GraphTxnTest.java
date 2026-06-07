@@ -1,5 +1,6 @@
 package top.ilovemyhome.zora.rocksdb.graph.store;
 
+import static top.ilovemyhome.zora.rocksdb.graph.store.TestSupport.openTestStore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,7 +40,7 @@ class GraphTxnTest {
 
     @Test
     void shouldPersistChangesAfterCommit() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
                 t.commit();
@@ -50,7 +51,7 @@ class GraphTxnTest {
 
     @Test
     void shouldDiscardChangesAfterRollback() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
                 t.rollback();
@@ -62,7 +63,7 @@ class GraphTxnTest {
     @Test
     void shouldImplicitlyRollbackOnCloseWithoutCommit() throws RocksDBException {
         // No explicit commit / rollback - close() must wipe pending writes.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
                 // Intentionally NO commit().
@@ -73,7 +74,7 @@ class GraphTxnTest {
 
     @Test
     void shouldRejectOperationsAfterCommit() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.commit();
                 assertThatThrownBy(() -> t.addVertex(new Vertex(1L, PERSON_TYPE)))
@@ -85,7 +86,7 @@ class GraphTxnTest {
 
     @Test
     void shouldRejectOperationsAfterRollback() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.rollback();
                 assertThatThrownBy(() -> t.getVertex(PERSON_TYPE, 1L))
@@ -99,7 +100,7 @@ class GraphTxnTest {
 
     @Test
     void shouldSeeOwnPendingWritesInsideTransaction() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
 
@@ -118,7 +119,7 @@ class GraphTxnTest {
         // A pending write held inside one txn must NOT be visible to a
         // non-transactional GraphStore.getVertex on another thread until
         // the txn commits.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
 
@@ -142,7 +143,7 @@ class GraphTxnTest {
         // Each thread runs its read+merge+write inside its OWN GraphTxn,
         // so the pessimistic lock taken by t.getVertex serialises the
         // critical section across threads.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
 
             int threadCount = 8;
@@ -184,7 +185,7 @@ class GraphTxnTest {
 
     @Test
     void shouldRollbackMultiVertexBatchAtomically() throws RocksDBException {
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
                 t.addVertex(new Vertex(2L, PERSON_TYPE).withProperty("name", "Bob"));
@@ -202,7 +203,7 @@ class GraphTxnTest {
         // findVerticesByProperty is intentionally NOT on GraphTxn (lock-free
         // path), so an index lookup BEFORE commit must miss, and AFTER
         // commit it must hit.
-        try (GraphStore store = new GraphStore(tempDir.toString())) {
+        try (GraphStore store = openTestStore(tempDir.toString())) {
             try (GraphTxn t = store.beginTransaction()) {
                 t.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("city", "BJ"));
                 // Pre-commit: outside-the-txn index query sees nothing.
