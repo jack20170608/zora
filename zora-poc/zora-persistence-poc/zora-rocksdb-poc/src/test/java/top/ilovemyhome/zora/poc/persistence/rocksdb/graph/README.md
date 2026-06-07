@@ -168,7 +168,6 @@ store.addEdge(new Edge(personId, companyId, WORKS_AT)
 
 | 特性 | 实现思路 |
 |------|---------|
-| Schema 验证 | 定义允许的顶点/边类型和属性约束 |
 | 图算法层 | 基于 `getNeighbors()` 实现 BFS/DFS/最短路径 |
 | 批量导入 | 使用 `WriteBatch` 批量写入，关闭 WAL 提升吞吐量 |
 | 分布式 | 按 `vertexId` 取模分区，跨分区边存储远程引用 |

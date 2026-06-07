@@ -1,29 +1,46 @@
 package top.ilovemyhome.zora.poc.persistence.rocksdb.graph.codec;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 /**
  * Binary codec for graph entity keys.
- * All keys use big-endian encoding to ensure lexicographical order matches numeric order.
+ * All numeric fields use big-endian so that the RocksDB lexicographical key
+ * order matches the natural numeric order, which lets every traversal and
+ * range query reduce to a {@code seek + prefix-scan}.
  *
- * Key formats:
- * - Vertex:     [V(1) | typeId(4) | vertexId(8)]              = 13 bytes
- * - Out Edge:   [E(1) | srcId(8) | edgeType(4) | 'O'(1) | dstId(8)]   = 22 bytes
- * - In Edge:    [E(1) | dstId(8) | edgeType(4) | 'I'(1) | srcId(8)]   = 22 bytes
- * - Index:      [I(1) | typeId(4) | propHash(4) | value... | vertexId(8)] = variable
+ * <h2>Key formats</h2>
+ * <pre>
+ *   Vertex:  [ V(1) | typeId(4) | vertexId(8) ]                              13 bytes
+ *   OutEdge: [ E(1) | srcId(8)  | edgeType(4) | 'O' | dstId(8) ]             22 bytes
+ *   InEdge:  [ E(1) | dstId(8)  | edgeType(4) | 'I' | srcId(8) ]             22 bytes
+ *   Index:   [ I(1) | typeId(4) | propId(4)   | encodedValue | vertexId(8) ] variable
+ * </pre>
+ *
+ * <p>The index key layout intentionally puts {@code typeId} BEFORE the trailing
+ * {@code vertexId} as well, so callers scanning an index never need to fall
+ * back to the slow "scan-all-vertex-types" lookup when materializing results.
+ *
+ * <p>{@code encodedValue} is produced by
+ * {@link top.ilovemyhome.zora.poc.persistence.rocksdb.graph.model.Property#encodeValue(Object)}
+ * and consists of a 1-byte type tag followed by an order-preserving payload,
+ * which is what makes range queries on the property index possible.
  */
 public final class KeyCodec {
 
     private static final byte PREFIX_VERTEX = 'V';
-    private static final byte PREFIX_EDGE = 'E';
-    private static final byte PREFIX_INDEX = 'I';
+    private static final byte PREFIX_EDGE   = 'E';
+    private static final byte PREFIX_INDEX  = 'I';
 
     private static final byte DIR_OUT = 'O';
-    private static final byte DIR_IN = 'I';
+    private static final byte DIR_IN  = 'I';
 
     private static final int VERTEX_KEY_LEN = 1 + 4 + 8;       // 13
-    private static final int EDGE_KEY_LEN = 1 + 8 + 4 + 1 + 8; // 22
+    private static final int EDGE_KEY_LEN   = 1 + 8 + 4 + 1 + 8; // 22
+
+    /** Length of the fixed header in an index key: prefix + typeId + propId. */
+    public static final int INDEX_HEADER_LEN = 1 + 4 + 4;
+    /** Length of the trailing vertexId in an index key. */
+    public static final int INDEX_TRAILER_LEN = 8;
 
     private KeyCodec() {
         // utility class
@@ -32,11 +49,7 @@ public final class KeyCodec {
     // ========================== Vertex Keys ==========================
 
     /**
-     * Encodes a vertex key.
-     *
-     * @param typeId   the vertex type id
-     * @param vertexId the vertex unique id
-     * @return 13-byte key
+     * Encodes a vertex key: {@code V | typeId | vertexId}.
      */
     public static byte[] encodeVertexKey(int typeId, long vertexId) {
         ByteBuffer buf = ByteBuffer.allocate(VERTEX_KEY_LEN);
@@ -46,31 +59,16 @@ public final class KeyCodec {
         return buf.array();
     }
 
-    /**
-     * Decodes a vertex key to extract the vertex id.
-     *
-     * @param key the vertex key bytes
-     * @return the vertex id
-     */
     public static long decodeVertexId(byte[] key) {
         return ByteBuffer.wrap(key).getLong(1 + 4);
     }
 
-    /**
-     * Decodes a vertex key to extract the type id.
-     *
-     * @param key the vertex key bytes
-     * @return the type id
-     */
     public static int decodeVertexTypeId(byte[] key) {
         return ByteBuffer.wrap(key).getInt(1);
     }
 
     /**
-     * Returns the prefix for scanning all vertices of a given type.
-     *
-     * @param typeId the vertex type id
-     * @return 5-byte prefix
+     * Returns a 5-byte prefix that selects every vertex of a given type.
      */
     public static byte[] vertexPrefix(int typeId) {
         ByteBuffer buf = ByteBuffer.allocate(1 + 4);
@@ -82,13 +80,10 @@ public final class KeyCodec {
     // ========================== Edge Keys ==========================
 
     /**
-     * Encodes an edge key.
-     *
-     * @param firstId  the primary id (src for out, dst for in)
-     * @param edgeType the edge type id
-     * @param dir      the direction ('O' or 'I')
-     * @param secondId the secondary id (dst for out, src for in)
-     * @return 22-byte key
+     * Encodes either side of a bidirectional edge entry. The same logical edge
+     * is stored twice (one OUT key on the source, one IN key on the
+     * destination), which lets both {@code getOutEdges} and {@code getInEdges}
+     * run as pure prefix scans.
      */
     public static byte[] encodeEdgeKey(long firstId, int edgeType, Direction dir, long secondId) {
         ByteBuffer buf = ByteBuffer.allocate(EDGE_KEY_LEN);
@@ -100,27 +95,17 @@ public final class KeyCodec {
         return buf.array();
     }
 
-    /**
-     * Encodes an outgoing edge key: E | srcId | edgeType | 'O' | dstId.
-     */
     public static byte[] encodeOutEdgeKey(long srcId, int edgeType, long dstId) {
         return encodeEdgeKey(srcId, edgeType, Direction.OUT, dstId);
     }
 
-    /**
-     * Encodes an incoming edge key: E | dstId | edgeType | 'I' | srcId.
-     */
     public static byte[] encodeInEdgeKey(long dstId, int edgeType, long srcId) {
         return encodeEdgeKey(dstId, edgeType, Direction.IN, srcId);
     }
 
     /**
-     * Returns the prefix for scanning edges of a vertex in a given direction.
-     *
-     * @param vertexId the vertex id (src for out, dst for in)
-     * @param edgeType the edge type id
-     * @param dir      the direction
-     * @return 14-byte prefix
+     * Returns a 14-byte prefix that selects every edge attached to
+     * {@code vertexId} in the given direction with the given type.
      */
     public static byte[] edgePrefix(long vertexId, int edgeType, Direction dir) {
         ByteBuffer buf = ByteBuffer.allocate(1 + 8 + 4 + 1);
@@ -132,11 +117,9 @@ public final class KeyCodec {
     }
 
     /**
-     * Returns the prefix for scanning all edges connected to a vertex,
-     * regardless of edge type or direction.
-     *
-     * @param vertexId the vertex id
-     * @return 9-byte prefix
+     * Returns a 9-byte prefix that selects every edge attached to a vertex,
+     * regardless of direction or type. Used by {@code removeVertex} to wipe
+     * every incident edge in a single iterator pass.
      */
     public static byte[] edgePrefix(long vertexId) {
         ByteBuffer buf = ByteBuffer.allocate(1 + 8);
@@ -145,36 +128,18 @@ public final class KeyCodec {
         return buf.array();
     }
 
-    /**
-     * Decodes the source id from an edge key.
-     * For outgoing edges, src is at offset 1; for incoming, src is at offset 14.
-     */
     public static long decodeEdgeSrcId(byte[] key) {
         ByteBuffer buf = ByteBuffer.wrap(key);
         byte dir = buf.get(1 + 8 + 4);
-        if (dir == DIR_OUT) {
-            return buf.getLong(1);
-        } else {
-            return buf.getLong(1 + 8 + 4 + 1);
-        }
+        return dir == DIR_OUT ? buf.getLong(1) : buf.getLong(1 + 8 + 4 + 1);
     }
 
-    /**
-     * Decodes the destination id from an edge key.
-     */
     public static long decodeEdgeDstId(byte[] key) {
         ByteBuffer buf = ByteBuffer.wrap(key);
         byte dir = buf.get(1 + 8 + 4);
-        if (dir == DIR_OUT) {
-            return buf.getLong(1 + 8 + 4 + 1);
-        } else {
-            return buf.getLong(1);
-        }
+        return dir == DIR_OUT ? buf.getLong(1 + 8 + 4 + 1) : buf.getLong(1);
     }
 
-    /**
-     * Decodes the edge type from an edge key.
-     */
     public static int decodeEdgeType(byte[] key) {
         return ByteBuffer.wrap(key).getInt(1 + 8);
     }
@@ -182,44 +147,107 @@ public final class KeyCodec {
     // ========================== Index Keys ==========================
 
     /**
-     * Encodes an index key for property lookup.
-     * Format: I | typeId(4) | propHash(4) | valueBytes | vertexId(8)
+     * Encodes a full index entry key.
      *
-     * @param typeId   the vertex type id
-     * @param propHash the hash of the property name
-     * @param value    the encoded property value bytes
-     * @param vertexId the vertex id
-     * @return variable-length index key
+     * @param typeId       the vertex type id
+     * @param propId       the per-database property id (assigned by the schema
+     *                     dictionary); 4-byte numeric id replaces the old hash
+     *                     to eliminate collisions
+     * @param encodedValue tag + order-preserving payload from
+     *                     {@link top.ilovemyhome.zora.poc.persistence.rocksdb.graph.model.Property#encodeValue(Object)}
+     * @param vertexId     the owning vertex id (trailing position so multiple
+     *                     vertices can share the same value)
      */
-    public static byte[] encodeIndexKey(int typeId, int propHash, byte[] value, long vertexId) {
-        ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4 + value.length + 8);
+    public static byte[] encodeIndexKey(int typeId, int propId, byte[] encodedValue, long vertexId) {
+        ByteBuffer buf = ByteBuffer.allocate(INDEX_HEADER_LEN + encodedValue.length + INDEX_TRAILER_LEN);
         buf.put(PREFIX_INDEX);
         buf.putInt(typeId);
-        buf.putInt(propHash);
-        buf.put(value);
+        buf.putInt(propId);
+        buf.put(encodedValue);
         buf.putLong(vertexId);
         return buf.array();
     }
 
     /**
-     * Returns the prefix for scanning index entries of a specific property.
-     *
-     * @param typeId   the vertex type id
-     * @param propHash the property name hash
-     * @return 9-byte prefix
+     * Returns the 9-byte prefix selecting every index entry for a given
+     * (typeId, propId) pair, regardless of value.
      */
-    public static byte[] indexPrefix(int typeId, int propHash) {
-        ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4);
+    public static byte[] indexPrefix(int typeId, int propId) {
+        ByteBuffer buf = ByteBuffer.allocate(INDEX_HEADER_LEN);
         buf.put(PREFIX_INDEX);
         buf.putInt(typeId);
-        buf.putInt(propHash);
+        buf.putInt(propId);
         return buf.array();
+    }
+
+    /**
+     * Returns the prefix selecting every index entry for one exact value.
+     * The result is {@code header + encodedValue}, so a {@code seek(prefix)}
+     * lands on the first matching vertex and the scan can stop as soon as
+     * {@link #startsWith(byte[], byte[])} reports false.
+     */
+    public static byte[] indexValuePrefix(int typeId, int propId, byte[] encodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(INDEX_HEADER_LEN + encodedValue.length);
+        buf.put(PREFIX_INDEX);
+        buf.putInt(typeId);
+        buf.putInt(propId);
+        buf.put(encodedValue);
+        return buf.array();
+    }
+
+    /**
+     * Returns the smallest possible index key for {@code (typeId, propId,
+     * lowEncodedValue)}, suitable as the {@code seek} target for a range scan.
+     */
+    public static byte[] indexRangeLowerBound(int typeId, int propId, byte[] lowEncodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(INDEX_HEADER_LEN + lowEncodedValue.length + INDEX_TRAILER_LEN);
+        buf.put(PREFIX_INDEX);
+        buf.putInt(typeId);
+        buf.putInt(propId);
+        buf.put(lowEncodedValue);
+        // Trailing vertexId set to all-zero so we land on the very first hit.
+        return buf.array();
+    }
+
+    /**
+     * Returns the largest possible index key for {@code (typeId, propId,
+     * highEncodedValue)}, suitable for the inclusive upper-bound check inside
+     * a range scan loop.
+     */
+    public static byte[] indexRangeUpperBound(int typeId, int propId, byte[] highEncodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(INDEX_HEADER_LEN + highEncodedValue.length + INDEX_TRAILER_LEN);
+        buf.put(PREFIX_INDEX);
+        buf.putInt(typeId);
+        buf.putInt(propId);
+        buf.put(highEncodedValue);
+        // Trailing vertexId set to all-0xFF so every same-value entry is
+        // included in the inclusive upper bound.
+        for (int i = buf.position(); i < buf.capacity(); i++) {
+            buf.put((byte) 0xFF);
+        }
+        return buf.array();
+    }
+
+    /**
+     * Extracts the owning {@code typeId} from an index key. Used when the
+     * caller wants to materialize the matching vertex without falling back to
+     * a full vertex-CF scan.
+     */
+    public static int decodeIndexTypeId(byte[] indexKey) {
+        return ByteBuffer.wrap(indexKey).getInt(1);
+    }
+
+    /**
+     * Extracts the trailing {@code vertexId} from an index key.
+     */
+    public static long decodeIndexVertexId(byte[] indexKey) {
+        return ByteBuffer.wrap(indexKey).getLong(indexKey.length - INDEX_TRAILER_LEN);
     }
 
     // ========================== Utility ==========================
 
     /**
-     * Checks if the given key starts with the specified prefix.
+     * Returns true iff {@code key} starts with the given {@code prefix}.
      */
     public static boolean startsWith(byte[] key, byte[] prefix) {
         if (key.length < prefix.length) return false;
@@ -230,7 +258,20 @@ public final class KeyCodec {
     }
 
     /**
-     * Direction of an edge.
+     * Unsigned lexicographical comparison between two byte arrays, used by
+     * the range-scan loop to test against the upper bound.
+     */
+    public static int compareUnsigned(byte[] a, byte[] b) {
+        int min = Math.min(a.length, b.length);
+        for (int i = 0; i < min; i++) {
+            int diff = (a[i] & 0xFF) - (b[i] & 0xFF);
+            if (diff != 0) return diff;
+        }
+        return a.length - b.length;
+    }
+
+    /**
+     * Direction of an edge entry.
      */
     public enum Direction {
         OUT(DIR_OUT),
