@@ -378,4 +378,301 @@ class GraphStoreTest {
             assertThat(aliceToBob.getProperties().get("since")).isEqualTo("2020");
         }
     }
+
+    // ========================== Edge Property Index ==========================
+
+    @Test
+    void shouldFindEdgesByPropertyGlobally() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
+            store.addEdge(new Edge(1L, 3L, KNOWS_TYPE).withProperty("since", "2021"));
+            store.addEdge(new Edge(2L, 3L, KNOWS_TYPE).withProperty("since", "2020"));
+            // Different edge type with same value must not bleed in.
+            store.addEdge(new Edge(1L, 2L, FOLLOWS_TYPE).withProperty("since", "2020"));
+
+            List<Edge> matches = store.findEdgesByProperty(KNOWS_TYPE, "since", "2020");
+            assertThat(matches).hasSize(2);
+            assertThat(matches)
+                .extracting(e -> e.getSrcId() + "->" + e.getDstId())
+                .containsExactlyInAnyOrder("1->2", "2->3");
+        }
+    }
+
+    @Test
+    void shouldFindEdgesByIntegerPropertyRange() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("weight", 1));
+            store.addEdge(new Edge(1L, 3L, KNOWS_TYPE).withProperty("weight", 5));
+            store.addEdge(new Edge(2L, 3L, KNOWS_TYPE).withProperty("weight", 10));
+            store.addEdge(new Edge(2L, 4L, KNOWS_TYPE).withProperty("weight", 20));
+
+            List<Edge> mid = store.findEdgesByPropertyRange(KNOWS_TYPE, "weight", 5, 15);
+            assertThat(mid)
+                .extracting(e -> e.getSrcId() + "->" + e.getDstId())
+                .containsExactlyInAnyOrder("1->3", "2->3");
+        }
+    }
+
+    @Test
+    void shouldFindOutAndInEdgesByProperty() throws RocksDBException {
+        // Endpoint-keyed flavour: filter Alice's OUT edges by since=2020 without
+        // intersecting two separate scans in user code.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
+            store.addEdge(new Edge(1L, 3L, KNOWS_TYPE).withProperty("since", "2021"));
+            store.addEdge(new Edge(1L, 4L, KNOWS_TYPE).withProperty("since", "2020"));
+            store.addEdge(new Edge(5L, 1L, KNOWS_TYPE).withProperty("since", "2020"));
+
+            List<Edge> aliceOut2020 = store.findOutEdgesByProperty(1L, KNOWS_TYPE, "since", "2020");
+            assertThat(aliceOut2020).extracting(Edge::getDstId).containsExactlyInAnyOrder(2L, 4L);
+
+            // Symmetric: Alice as destination, only the incoming 5->1 should match.
+            List<Edge> aliceIn2020 = store.findInEdgesByProperty(1L, KNOWS_TYPE, "since", "2020");
+            assertThat(aliceIn2020).extracting(Edge::getSrcId).containsExactly(5L);
+        }
+    }
+
+    @Test
+    void shouldCleanUpStaleEdgeIndexOnPropertyUpdate() throws RocksDBException {
+        // addEdge re-runs as an upsert; the previous "since=2020" index entries
+        // (all three flavours) must disappear when we rewrite the same edge
+        // with "since=2099".
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020")).hasSize(1);
+
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2099"));
+
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020")).isEmpty();
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2099")).hasSize(1);
+            assertThat(store.findOutEdgesByProperty(1L, KNOWS_TYPE, "since", "2020")).isEmpty();
+            assertThat(store.findInEdgesByProperty(2L, KNOWS_TYPE, "since", "2020")).isEmpty();
+        }
+    }
+
+    @Test
+    void shouldCleanUpEdgeIndexOnRemoveEdge() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
+            store.removeEdge(1L, KNOWS_TYPE, 2L);
+
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020")).isEmpty();
+            assertThat(store.findOutEdgesByProperty(1L, KNOWS_TYPE, "since", "2020")).isEmpty();
+            assertThat(store.findInEdgesByProperty(2L, KNOWS_TYPE, "since", "2020")).isEmpty();
+        }
+    }
+
+    @Test
+    void shouldCleanUpEdgeIndexOnRemoveVertex() throws RocksDBException {
+        // Deleting a vertex must cascade-delete every incident edge AND each
+        // edge's 3-way index entries; otherwise findEdgesByProperty returns
+        // ghost edges that the user can't even resolve to a real Edge.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
+            store.addVertex(new Vertex(2L, PERSON_TYPE).withProperty("name", "Bob"));
+            store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("name", "Charlie"));
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
+            store.addEdge(new Edge(3L, 1L, KNOWS_TYPE).withProperty("since", "2020"));
+
+            store.removeVertex(PERSON_TYPE, 1L);
+
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020")).isEmpty();
+            assertThat(store.findOutEdgesByProperty(3L, KNOWS_TYPE, "since", "2020")).isEmpty();
+        }
+    }
+
+    @Test
+    void shouldShareSchemaDictionaryAcrossVertexAndEdge() throws RocksDBException {
+        // Single propId namespace - resolving "name" via addVertex must be the
+        // same id later used by edge indexing for the property "name".
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("name", "best-friend"));
+
+            // Both indexes must be reachable through the same name.
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "name", "Alice"))
+                .extracting(Vertex::getId).containsExactly(1L);
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "name", "best-friend"))
+                .extracting(e -> e.getSrcId() + "->" + e.getDstId())
+                .containsExactly("1->2");
+        }
+    }
+
+    @Test
+    void shouldPersistEdgeIndexAcrossReopens() throws RocksDBException {
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("since", "2020"));
+        }
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            assertThat(store.findEdgesByProperty(KNOWS_TYPE, "since", "2020"))
+                .extracting(e -> e.getSrcId() + "->" + e.getDstId())
+                .containsExactly("1->2");
+        }
+    }
+
+    @Test
+    void shouldFindOutEdgesByPropertyRange() throws RocksDBException {
+        // Endpoint + range filter without any user-side intersection.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(1L, 2L, KNOWS_TYPE).withProperty("weight", 1));
+            store.addEdge(new Edge(1L, 3L, KNOWS_TYPE).withProperty("weight", 5));
+            store.addEdge(new Edge(1L, 4L, KNOWS_TYPE).withProperty("weight", 10));
+            store.addEdge(new Edge(1L, 5L, KNOWS_TYPE).withProperty("weight", 20));
+            store.addEdge(new Edge(7L, 8L, KNOWS_TYPE).withProperty("weight", 7));
+
+            List<Edge> mid = store.findOutEdgesByPropertyRange(1L, KNOWS_TYPE, "weight", 5, 15);
+            assertThat(mid).extracting(Edge::getDstId).containsExactlyInAnyOrder(3L, 4L);
+            // Crucially, the (7,8) edge with weight=7 must NOT show up: it's an
+            // out-edge of vertex 7, not of vertex 1.
+
+            // Lower-only edge case: high == max value in range
+            List<Edge> hi = store.findOutEdgesByPropertyRange(1L, KNOWS_TYPE, "weight", 15, 100);
+            assertThat(hi).extracting(Edge::getDstId).containsExactly(5L);
+        }
+    }
+
+    @Test
+    void shouldFindInEdgesByPropertyRange() throws RocksDBException {
+        // Same shape, dst-keyed flavour.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addEdge(new Edge(2L, 1L, KNOWS_TYPE).withProperty("weight", 1));
+            store.addEdge(new Edge(3L, 1L, KNOWS_TYPE).withProperty("weight", 5));
+            store.addEdge(new Edge(4L, 1L, KNOWS_TYPE).withProperty("weight", 10));
+            store.addEdge(new Edge(5L, 6L, KNOWS_TYPE).withProperty("weight", 7));
+
+            List<Edge> mid = store.findInEdgesByPropertyRange(1L, KNOWS_TYPE, "weight", 5, 15);
+            assertThat(mid).extracting(Edge::getSrcId).containsExactlyInAnyOrder(3L, 4L);
+        }
+    }
+
+    // ========================== Reverse Index (vertexId -> typeId) ==========================
+
+    @Test
+    void shouldResolveVertexByIdAcrossMultipleTypes() throws RocksDBException {
+        // The reverse index makes getVertex(long) a point lookup regardless
+        // of typeId. This used to silently rely on a full cf_vertex scan.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
+            store.addVertex(new Vertex(2L, PERSON_TYPE + 5).withProperty("name", "Acme Corp"));
+            store.addVertex(new Vertex(3L, PERSON_TYPE).withProperty("name", "Bob"));
+
+            assertThat(store.getVertex(1L).getProperty("name")).isEqualTo("Alice");
+            assertThat(store.getVertex(2L).getProperty("name")).isEqualTo("Acme Corp");
+            assertThat(store.getVertex(3L).getProperty("name")).isEqualTo("Bob");
+            assertThat(store.getVertex(999L)).isNull();
+        }
+    }
+
+    @Test
+    void shouldRemoveReverseIndexEntryOnVertexDelete() throws RocksDBException {
+        // After removeVertex, the reverse entry must also be gone so
+        // getVertex(long) returns null without ever fall-backing to a scan
+        // (which would have also returned null but slower).
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("name", "Alice"));
+            assertThat(store.getVertex(1L)).isNotNull();
+            store.removeVertex(PERSON_TYPE, 1L);
+            assertThat(store.getVertex(1L)).isNull();
+        }
+    }
+
+    // ========================== Concurrency ==========================
+
+    @Test
+    void shouldKeepIndexConsistentUnderConcurrentChurn() throws Exception {
+        // TransactionDB does NOT magically make addVertex a field-level merge -
+        // it's still a whole-object overwrite, so last-writer-wins is normal
+        // and expected. What the pessimistic lock DOES guarantee is that the
+        // "read previous + delete stale index + put new vertex + put new
+        // index" sequence inside addVertex commits atomically against
+        // concurrent writers - so the secondary index never points at a
+        // vertex whose stored value disagrees.
+        //
+        // This test stresses the same vertex from many threads, each
+        // randomly choosing one of N city values. After the storm settles,
+        // findVerticesByProperty must return the vertex exactly when the
+        // vertex's persisted "city" property matches the query - never
+        // returning a ghost match, never missing a real one.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            store.addVertex(new Vertex(1L, PERSON_TYPE).withProperty("city", "BJ"));
+
+            String[] cities = {"BJ", "SH", "SZ", "HZ", "GZ"};
+            int threadCount = 8;
+            int iterPerThread = 100;
+            java.util.concurrent.ExecutorService pool =
+                java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+            try {
+                java.util.List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+                for (int t = 0; t < threadCount; t++) {
+                    final int seed = t;
+                    futures.add(pool.submit(() -> {
+                        java.util.Random rng = new java.util.Random(seed);
+                        for (int i = 0; i < iterPerThread; i++) {
+                            try {
+                                String city = cities[rng.nextInt(cities.length)];
+                                store.addVertex(new Vertex(1L, PERSON_TYPE)
+                                    .withProperty("city", city));
+                            } catch (RocksDBException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                        return null;
+                    }));
+                }
+                for (var f : futures) f.get();
+            } finally {
+                pool.shutdownNow();
+            }
+
+            // Whichever value won the race, the vertex + index must agree:
+            Vertex finalVertex = store.getVertex(PERSON_TYPE, 1L);
+            assertThat(finalVertex).isNotNull();
+            String finalCity = (String) finalVertex.getProperty("city");
+            assertThat(finalCity).isIn((Object[]) cities);
+
+            // The winning city must locate vertex 1 via the index.
+            assertThat(store.findVerticesByProperty(PERSON_TYPE, "city", finalCity))
+                .extracting(Vertex::getId).contains(1L);
+
+            // Every losing city must NOT return vertex 1 - no stale index.
+            for (String losing : cities) {
+                if (losing.equals(finalCity)) continue;
+                assertThat(store.findVerticesByProperty(PERSON_TYPE, "city", losing))
+                    .extracting(Vertex::getId).doesNotContain(1L);
+            }
+        }
+    }
+
+    @Test
+    void shouldGenerateUniqueIdsUnderContention() throws Exception {
+        // nextVertexId() runs as its own mini-txn; verify two threads never
+        // get the same number back even when racing tightly.
+        try (GraphStore store = new GraphStore(tempDir.toString())) {
+            int threadCount = 8;
+            int iterPerThread = 200;
+            java.util.concurrent.ExecutorService pool =
+                java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+            java.util.Set<Long> ids =
+                java.util.concurrent.ConcurrentHashMap.newKeySet();
+            try {
+                java.util.List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+                for (int t = 0; t < threadCount; t++) {
+                    futures.add(pool.submit(() -> {
+                        for (int i = 0; i < iterPerThread; i++) {
+                            try {
+                                ids.add(store.nextVertexId());
+                            } catch (RocksDBException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                        return null;
+                    }));
+                }
+                for (var f : futures) f.get();
+            } finally {
+                pool.shutdownNow();
+            }
+            assertThat(ids).hasSize(threadCount * iterPerThread);
+        }
+    }
 }

@@ -29,6 +29,8 @@ public final class KeyCodec {
     private static final byte PREFIX_VERTEX = 'V';
     private static final byte PREFIX_EDGE   = 'E';
     private static final byte PREFIX_INDEX  = 'I';
+    /** Edge property index prefix - 'J' to stay adjacent to 'I' in ASCII for easy visual grep. */
+    private static final byte PREFIX_INDEX_EDGE = 'J';
 
     private static final byte DIR_OUT = 'O';
     private static final byte DIR_IN  = 'I';
@@ -222,6 +224,199 @@ public final class KeyCodec {
 
     public static long decodeIndexVertexId(byte[] indexKey) {
         return ByteBuffer.wrap(indexKey).getLong(indexKey.length - INDEX_TRAILER_LEN);
+    }
+
+    // ========================== Edge Index Keys ==========================
+    //
+    // Three flavours of edge index keys live side-by-side in cf_edge_index,
+    // discriminated by the second byte (P / S / D). One logical edge attribute
+    // gets written 3 times - the write amplification buys us O(1) prefix
+    // scans for every meaningful query shape:
+    //
+    //   J | P | eTypeId(4) | propId(4) | encVal | srcId(8) | dstId(8)
+    //     - global "every edge of type T whose prop = v"
+    //
+    //   J | S | srcId(8)   | eTypeId(4) | propId(4) | encVal | dstId(8)
+    //     - "every OUT edge of src with prop = v" (no extra filter needed)
+    //
+    //   J | D | dstId(8)   | eTypeId(4) | propId(4) | encVal | srcId(8)
+    //     - symmetric IN-edge variant
+    //
+    // The trailing endpoint(s) are inside the key so the same (eType, prop,
+    // value) shared by multiple edges does not collide.
+
+    private static final byte EI_FLAVOR_GLOBAL = 'P';
+    private static final byte EI_FLAVOR_SRC    = 'S';
+    private static final byte EI_FLAVOR_DST    = 'D';
+
+    // Global flavour:  J | P | eTypeId(4) | propId(4) | encVal | srcId(8) | dstId(8)
+    /** Header length of a global edge index key, up to and including propId. */
+    public static final int EI_GLOBAL_HEADER_LEN  = 2 + 4 + 4;
+    /** Trailer length of a global edge index key: srcId + dstId. */
+    public static final int EI_GLOBAL_TRAILER_LEN = 8 + 8;
+
+    // Endpoint flavours (SRC / DST): J | F | endpointId(8) | eTypeId(4) | propId(4) | encVal | otherEndpointId(8)
+    /** Header length of an endpoint-keyed edge index key, up to propId. */
+    public static final int EI_ENDPOINT_HEADER_LEN  = 2 + 8 + 4 + 4;
+    /** Trailer length of an endpoint-keyed edge index key: the other endpoint. */
+    public static final int EI_ENDPOINT_TRAILER_LEN = 8;
+
+    // -------------------- Global edge index --------------------
+
+    /**
+     * Encodes a global edge index entry {@code J | P | eType | propId | encVal | src | dst}.
+     */
+    public static byte[] encodeEdgeIndexGlobalKey(int edgeType, int propId, byte[] encodedValue,
+                                                  long srcId, long dstId) {
+        ByteBuffer buf = ByteBuffer.allocate(
+            EI_GLOBAL_HEADER_LEN + encodedValue.length + EI_GLOBAL_TRAILER_LEN);
+        buf.put(PREFIX_INDEX_EDGE);
+        buf.put(EI_FLAVOR_GLOBAL);
+        buf.putInt(edgeType);
+        buf.putInt(propId);
+        buf.put(encodedValue);
+        buf.putLong(srcId);
+        buf.putLong(dstId);
+        return buf.array();
+    }
+
+    /**
+     * Returns the prefix selecting every global edge index entry for one
+     * exact {@code (eType, propId, value)}.
+     */
+    public static byte[] edgeIndexGlobalValuePrefix(int edgeType, int propId, byte[] encodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(EI_GLOBAL_HEADER_LEN + encodedValue.length);
+        buf.put(PREFIX_INDEX_EDGE);
+        buf.put(EI_FLAVOR_GLOBAL);
+        buf.putInt(edgeType);
+        buf.putInt(propId);
+        buf.put(encodedValue);
+        return buf.array();
+    }
+
+    /**
+     * Returns the lower bound for a global-edge range scan: the trailing
+     * endpoint pair is zero-filled.
+     */
+    public static byte[] edgeIndexGlobalRangeLowerBound(int edgeType, int propId,
+                                                        byte[] lowEncodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(
+            EI_GLOBAL_HEADER_LEN + lowEncodedValue.length + EI_GLOBAL_TRAILER_LEN);
+        buf.put(PREFIX_INDEX_EDGE);
+        buf.put(EI_FLAVOR_GLOBAL);
+        buf.putInt(edgeType);
+        buf.putInt(propId);
+        buf.put(lowEncodedValue);
+        return buf.array();
+    }
+
+    /**
+     * Returns the upper bound for a global-edge range scan: the trailing
+     * endpoint pair is set to 0xFF so the inclusive max is captured.
+     */
+    public static byte[] edgeIndexGlobalRangeUpperBound(int edgeType, int propId,
+                                                        byte[] highEncodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(
+            EI_GLOBAL_HEADER_LEN + highEncodedValue.length + EI_GLOBAL_TRAILER_LEN);
+        buf.put(PREFIX_INDEX_EDGE);
+        buf.put(EI_FLAVOR_GLOBAL);
+        buf.putInt(edgeType);
+        buf.putInt(propId);
+        buf.put(highEncodedValue);
+        for (int i = buf.position(); i < buf.capacity(); i++) {
+            buf.put((byte) 0xFF);
+        }
+        return buf.array();
+    }
+
+    /** Pulls {@code (eType, srcId, dstId)} out of a global edge index key. */
+    public static int  decodeEdgeIndexGlobalType(byte[] key)  { return ByteBuffer.wrap(key).getInt(2); }
+    public static long decodeEdgeIndexGlobalSrc (byte[] key)  {
+        return ByteBuffer.wrap(key).getLong(key.length - EI_GLOBAL_TRAILER_LEN);
+    }
+    public static long decodeEdgeIndexGlobalDst (byte[] key)  {
+        return ByteBuffer.wrap(key).getLong(key.length - 8);
+    }
+
+    // -------------------- Endpoint-keyed edge index --------------------
+
+    /**
+     * Encodes an endpoint-keyed edge index entry:
+     * {@code J | flavor | endpointId | eType | propId | encVal | otherEndpointId}.
+     *
+     * @param srcSide true to write the SRC-flavored key (used for OUT-edge
+     *                queries from a vertex), false to write the DST-flavored
+     *                key (used for IN-edge queries).
+     */
+    public static byte[] encodeEdgeIndexEndpointKey(boolean srcSide, long endpointId,
+                                                    int edgeType, int propId,
+                                                    byte[] encodedValue, long otherEndpointId) {
+        ByteBuffer buf = ByteBuffer.allocate(
+            EI_ENDPOINT_HEADER_LEN + encodedValue.length + EI_ENDPOINT_TRAILER_LEN);
+        buf.put(PREFIX_INDEX_EDGE);
+        buf.put(srcSide ? EI_FLAVOR_SRC : EI_FLAVOR_DST);
+        buf.putLong(endpointId);
+        buf.putInt(edgeType);
+        buf.putInt(propId);
+        buf.put(encodedValue);
+        buf.putLong(otherEndpointId);
+        return buf.array();
+    }
+
+    /**
+     * Returns the prefix selecting every endpoint-keyed edge index entry for
+     * an exact {@code (endpoint, eType, propId, value)}.
+     */
+    public static byte[] edgeIndexEndpointValuePrefix(boolean srcSide, long endpointId,
+                                                      int edgeType, int propId,
+                                                      byte[] encodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(EI_ENDPOINT_HEADER_LEN + encodedValue.length);
+        buf.put(PREFIX_INDEX_EDGE);
+        buf.put(srcSide ? EI_FLAVOR_SRC : EI_FLAVOR_DST);
+        buf.putLong(endpointId);
+        buf.putInt(edgeType);
+        buf.putInt(propId);
+        buf.put(encodedValue);
+        return buf.array();
+    }
+
+    public static byte[] edgeIndexEndpointRangeLowerBound(boolean srcSide, long endpointId,
+                                                          int edgeType, int propId,
+                                                          byte[] lowEncodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(
+            EI_ENDPOINT_HEADER_LEN + lowEncodedValue.length + EI_ENDPOINT_TRAILER_LEN);
+        buf.put(PREFIX_INDEX_EDGE);
+        buf.put(srcSide ? EI_FLAVOR_SRC : EI_FLAVOR_DST);
+        buf.putLong(endpointId);
+        buf.putInt(edgeType);
+        buf.putInt(propId);
+        buf.put(lowEncodedValue);
+        return buf.array();
+    }
+
+    public static byte[] edgeIndexEndpointRangeUpperBound(boolean srcSide, long endpointId,
+                                                          int edgeType, int propId,
+                                                          byte[] highEncodedValue) {
+        ByteBuffer buf = ByteBuffer.allocate(
+            EI_ENDPOINT_HEADER_LEN + highEncodedValue.length + EI_ENDPOINT_TRAILER_LEN);
+        buf.put(PREFIX_INDEX_EDGE);
+        buf.put(srcSide ? EI_FLAVOR_SRC : EI_FLAVOR_DST);
+        buf.putLong(endpointId);
+        buf.putInt(edgeType);
+        buf.putInt(propId);
+        buf.put(highEncodedValue);
+        for (int i = buf.position(); i < buf.capacity(); i++) {
+            buf.put((byte) 0xFF);
+        }
+        return buf.array();
+    }
+
+    public static long decodeEdgeIndexEndpointOther(byte[] key) {
+        return ByteBuffer.wrap(key).getLong(key.length - EI_ENDPOINT_TRAILER_LEN);
+    }
+
+    public static int decodeEdgeIndexEndpointType(byte[] key) {
+        return ByteBuffer.wrap(key).getInt(2 + 8);
     }
 
     // ========================== Utility ==========================
