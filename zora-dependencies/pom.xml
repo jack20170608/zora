@@ -30,6 +30,7 @@
         <jdbi3.version>3.53.0</jdbi3.version>
         <muserver.version>2.2.8</muserver.version>
         <rocksdb.version>9.10.0</rocksdb.version>
+        <jline.version>3.30.6</jline.version>
     </properties>
 
     <dependencyManagement>
@@ -204,6 +205,13 @@
                 <groupId>org.rocksdb</groupId>
                 <artifactId>rocksdbjni</artifactId>
                 <version>${rocksdb.version}</version>
+            </dependency>
+
+            <!-- JLine terminal interaction for CUI POCs -->
+            <dependency>
+                <groupId>org.jline</groupId>
+                <artifactId>jline</artifactId>
+                <version>${jline.version}</version>
             </dependency>
 
         </dependencies>
