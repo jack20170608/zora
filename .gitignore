@@ -36,6 +36,9 @@ nbbuild/
 nbdist/
 .nb-gradle/
 
+# Code graph
+.codegraph/
+
 # Logs
 *.log
 logs/
