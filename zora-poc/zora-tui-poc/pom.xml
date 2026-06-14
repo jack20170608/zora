@@ -8,21 +8,16 @@
         <groupId>top.ilovemyhome.zora</groupId>
         <artifactId>zora-parent</artifactId>
         <version>${revision}</version>
-        <relativePath>../zora-parent/pom.xml</relativePath>
+        <relativePath>../../zora-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>zora-poc</artifactId>
+    <artifactId>zora-tui-poc</artifactId>
     <packaging>pom</packaging>
-    <name>zora-poc - POC Aggregator Module</name>
-    <description>Aggregator module for proof-of-concept and exploration sub-modules.
-        All code lives in test scope for experimenting with new frameworks and features.
-    </description>
+    <name>zora-tui-poc - Terminal User Interface Exploration</name>
+    <description>Aggregator POC module for exploring Java terminal user interface technologies.</description>
 
     <modules>
-        <module>zora-logger-poc</module>
-        <module>zora-test-poc</module>
-        <module>zora-persistence-poc</module>
-        <module>zora-tui-poc</module>
+        <module>zora-claude-tui-poc</module>
     </modules>
 
     <build>
@@ -35,6 +30,11 @@
                 <directory>src/main/resources</directory>
             </resource>
         </resources>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+        </testResources>
     </build>
 
 </project>
