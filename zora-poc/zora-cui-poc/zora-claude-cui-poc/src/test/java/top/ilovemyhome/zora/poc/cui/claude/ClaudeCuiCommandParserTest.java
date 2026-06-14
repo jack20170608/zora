@@ -39,6 +39,20 @@ class ClaudeCuiCommandParserTest {
     }
 
     @Test
+    void parsesConfigAliases() {
+        assertThat(parser.parse(":config").type()).isEqualTo(ClaudeCuiCommandType.CONFIG);
+        assertThat(parser.parse("/config").type()).isEqualTo(ClaudeCuiCommandType.CONFIG);
+    }
+
+    @Test
+    void treatsOtherSlashInputAsChatText() {
+        ClaudeCuiCommand command = parser.parse("/hello");
+
+        assertThat(command.type()).isEqualTo(ClaudeCuiCommandType.CHAT);
+        assertThat(command.content()).isEqualTo("/hello");
+    }
+
+    @Test
     void parsesUnknownColonCommand() {
         ClaudeCuiCommand command = parser.parse(":unknown");
 

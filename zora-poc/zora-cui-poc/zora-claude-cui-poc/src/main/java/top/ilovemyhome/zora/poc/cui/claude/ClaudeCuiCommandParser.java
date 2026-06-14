@@ -11,6 +11,7 @@ final class ClaudeCuiCommandParser {
         return switch (normalizedInput) {
             case ":help" -> ClaudeCuiCommand.of(ClaudeCuiCommandType.HELP);
             case ":clear" -> ClaudeCuiCommand.of(ClaudeCuiCommandType.CLEAR);
+            case ":config", "/config" -> ClaudeCuiCommand.of(ClaudeCuiCommandType.CONFIG);
             case ":exit", ":quit" -> ClaudeCuiCommand.of(ClaudeCuiCommandType.EXIT);
             default -> parseDefault(normalizedInput);
         };

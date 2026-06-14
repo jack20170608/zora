@@ -4,6 +4,7 @@ package top.ilovemyhome.zora.poc.cui.claude;
 enum ClaudeCuiCommandType {
     HELP,
     CLEAR,
+    CONFIG,
     EXIT,
     CHAT,
     EMPTY,

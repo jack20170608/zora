@@ -58,6 +58,11 @@ final class ClaudeCuiShell {
                 printWelcome();
                 yield state;
             }
+            case CONFIG -> {
+                writer().println("Configuration is not implemented yet.");
+                writer().flush();
+                yield state;
+            }
             case EXIT -> state.exit();
             case UNKNOWN -> {
                 writer().println("Unknown command: " + command.content() + ". Type :help for commands.");
