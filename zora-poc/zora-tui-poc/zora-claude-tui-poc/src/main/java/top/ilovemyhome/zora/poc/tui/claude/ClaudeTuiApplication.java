@@ -40,6 +40,7 @@ public final class ClaudeTuiApplication {
             PrintWriter writer = terminal.writer();
             ConfigMenuController configMenuController = new ConfigMenuController(
                 lineReader,
+                terminal,
                 writer,
                 configRepository);
             ClaudeTuiShell shell = new ClaudeTuiShell(

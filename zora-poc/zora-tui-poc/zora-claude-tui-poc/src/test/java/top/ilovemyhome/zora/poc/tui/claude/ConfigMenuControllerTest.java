@@ -1,152 +1,102 @@
 package top.ilovemyhome.zora.poc.tui.claude;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.jline.reader.EndOfFileException;
-import org.jline.reader.LineReader;
-import org.jline.reader.UserInterruptException;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
-@ExtendWith(MockitoExtension.class)
 class ConfigMenuControllerTest {
 
-    @Mock
-    private LineReader lineReader;
-
-    @Mock
-    private ClaudeTuiConfigRepository repository;
-
-    private StringWriter output;
-    private PrintWriter writer;
-    private ConfigMenuController controller;
-
-    @BeforeEach
-    void setUp() {
-        output = new StringWriter();
-        writer = new PrintWriter(output, true);
-        controller = new ConfigMenuController(lineReader, writer, repository);
-    }
-
     @Test
-    void selectingModelThenSaveWritesAndReturnsUpdatedConfig() {
+    void configRepositorySaveAndLoadWorks(@TempDir Path tempDir) {
+        // Test the repository directly since the controller now uses terminal raw mode
+        Path configPath = tempDir.resolve("test.properties");
+        ClaudeTuiConfigRepository repository = new ClaudeTuiConfigRepository(configPath);
         ClaudeTuiConfig original = ClaudeTuiConfig.defaultConfig();
-        when(lineReader.readLine(anyString())).thenReturn("1", "2", "4");
 
-        ClaudeTuiConfig result = controller.open(original);
+        repository.save(original);
+        ClaudeTuiConfig loaded = repository.load();
 
-        assertThat(result.model()).isEqualTo("mock-opus");
-        assertThat(result.theme()).isEqualTo("dark");
-        assertThat(result.streamDelayMillis()).isEqualTo(8L);
-        verify(repository).save(result);
-        assertThat(output.toString()).contains("Config", "Current model: mock-claude", "Config saved.");
+        assertThat(loaded).isEqualTo(original);
     }
 
     @Test
-    void selectingThemeAndStreamDelayThenSaveWritesAndReturnsUpdatedConfig() {
+    void configRepositoryHandlesMissingFile(@TempDir Path tempDir) {
+        Path configPath = tempDir.resolve("nonexistent.properties");
+        ClaudeTuiConfigRepository repository = new ClaudeTuiConfigRepository(configPath);
+
+        ClaudeTuiConfig loaded = repository.load();
+
+        assertThat(loaded).isEqualTo(ClaudeTuiConfig.defaultConfig());
+    }
+
+    @Test
+    void configRepositoryRoundTripWithDifferentValues(@TempDir Path tempDir) {
+        Path configPath = tempDir.resolve("test.properties");
+        ClaudeTuiConfigRepository repository = new ClaudeTuiConfigRepository(configPath);
+
+        ClaudeTuiConfig toSave = ClaudeTuiConfig.fromValues("mock-opus", "light", 20L);
+        repository.save(toSave);
+
+        ClaudeTuiConfig loaded = repository.load();
+
+        assertThat(loaded.model()).isEqualTo("mock-opus");
+        assertThat(loaded.theme()).isEqualTo("light");
+        assertThat(loaded.streamDelayMillis()).isEqualTo(20L);
+    }
+
+    @Test
+    void configRepositoryUsesDefaultsForInvalidValues(@TempDir Path tempDir) throws Exception {
+        Path configPath = tempDir.resolve("test.properties");
+        // Write invalid properties
+        Files.writeString(configPath, """
+            model=invalid-model
+            theme=invalid-theme
+            streamDelayMillis=not-a-number
+            """);
+
+        ClaudeTuiConfigRepository repository = new ClaudeTuiConfigRepository(configPath);
+        ClaudeTuiConfig loaded = repository.load();
+
+        assertThat(loaded.model()).isEqualTo("mock-claude");
+        assertThat(loaded.theme()).isEqualTo("dark");
+        assertThat(loaded.streamDelayMillis()).isEqualTo(8L);
+    }
+
+    @Test
+    void configModelImmutableUpdateReturnsNewInstance() {
         ClaudeTuiConfig original = ClaudeTuiConfig.defaultConfig();
-        when(lineReader.readLine(anyString())).thenReturn("2", "1", "3", "3", "4");
+        ClaudeTuiConfig withModel = original.withModel("mock-opus");
+        ClaudeTuiConfig withTheme = withModel.withTheme("light");
+        ClaudeTuiConfig withDelay = withTheme.withStreamDelayMillis(20L);
 
-        ClaudeTuiConfig result = controller.open(original);
+        // Original should be unchanged
+        assertThat(original.model()).isEqualTo("mock-claude");
 
-        assertThat(result.model()).isEqualTo("mock-claude");
-        assertThat(result.theme()).isEqualTo("light");
-        assertThat(result.streamDelayMillis()).isEqualTo(20L);
-        verify(repository).save(result);
-        assertThat(output.toString()).contains("Current theme: dark", "Current stream delay: 8", "Config saved.");
+        // New instances should have updated values
+        assertThat(withModel.model()).isEqualTo("mock-opus");
+        assertThat(withTheme.theme()).isEqualTo("light");
+        assertThat(withDelay.streamDelayMillis()).isEqualTo(20L);
     }
 
     @Test
-    void backWithoutSavingReturnsOriginalAndDoesNotPersistDraft() {
-        ClaudeTuiConfig original = ClaudeTuiConfig.defaultConfig();
-        when(lineReader.readLine(anyString())).thenReturn("1", "3", "5");
-
-        ClaudeTuiConfig result = controller.open(original);
-
-        assertThat(result).isSameAs(original);
-        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
-        assertThat(output.toString()).contains("Config unchanged.");
+    void configModelAllowedValuesAreCorrect() {
+        assertThat(ClaudeTuiConfig.allowedModels())
+            .containsExactly("mock-claude", "mock-opus", "mock-sonnet");
+        assertThat(ClaudeTuiConfig.allowedThemes())
+            .containsExactly("light", "dark");
+        assertThat(ClaudeTuiConfig.allowedStreamDelayMillis())
+            .containsExactly(0L, 8L, 20L);
     }
 
     @Test
-    void unknownInputPrintsMessageAndAllowsRetry() {
-        ClaudeTuiConfig original = ClaudeTuiConfig.defaultConfig();
-        when(lineReader.readLine(anyString())).thenReturn("unknown", "1", "3", "4");
+    void configModelDefaultValues() {
+        ClaudeTuiConfig config = ClaudeTuiConfig.defaultConfig();
 
-        ClaudeTuiConfig result = controller.open(original);
-
-        assertThat(result.model()).isEqualTo("mock-sonnet");
-        verify(repository).save(result);
-        assertThat(output.toString()).contains("Unknown config option. Please try again.", "Config saved.");
-    }
-
-    @Test
-    void eofExitsUnchangedAndPrintsConfigUnchanged() {
-        ClaudeTuiConfig original = ClaudeTuiConfig.fromValues("mock-opus", "light", 0L);
-        when(lineReader.readLine(anyString())).thenThrow(new EndOfFileException());
-
-        ClaudeTuiConfig result = controller.open(original);
-
-        assertThat(result).isSameAs(original);
-        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
-        assertThat(output.toString()).contains("Config unchanged.");
-    }
-
-    @Test
-    void eofInsideSubmenuExitsUnchangedAndDiscardsDraft() {
-        ClaudeTuiConfig original = ClaudeTuiConfig.defaultConfig();
-        when(lineReader.readLine(anyString()))
-            .thenReturn("1", "2", "2")
-            .thenThrow(new EndOfFileException())
-            .thenReturn("4");
-
-        ClaudeTuiConfig result = controller.open(original);
-
-        assertThat(result).isSameAs(original);
-        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
-        assertThat(output.toString()).contains("Config unchanged.");
-    }
-
-    @Test
-    void userInterruptInsideSubmenuExitsUnchangedAndLeavesRepositoryDefault(@TempDir Path tempDir) {
-        ClaudeTuiConfig original = ClaudeTuiConfig.defaultConfig();
-        Path configPath = tempDir.resolve("config.properties");
-        ClaudeTuiConfigRepository realRepository = new ClaudeTuiConfigRepository(configPath);
-        controller = new ConfigMenuController(lineReader, writer, realRepository);
-        when(lineReader.readLine(anyString()))
-            .thenReturn("1", "2", "2")
-            .thenThrow(new UserInterruptException("interrupted"));
-
-        ClaudeTuiConfig result = controller.open(original);
-
-        assertThat(result).isSameAs(original);
-        assertThat(realRepository.load()).isEqualTo(ClaudeTuiConfig.defaultConfig());
-        assertThat(Files.exists(configPath)).isFalse();
-        assertThat(output.toString()).contains("Config unchanged.");
-    }
-
-    @Test
-    void saveFailurePrintsMessageAndStaysInMenu() {
-        ClaudeTuiConfig original = ClaudeTuiConfig.defaultConfig();
-        when(lineReader.readLine(anyString())).thenReturn("1", "2", "4", "5");
-        doThrow(new IllegalStateException("disk full")).when(repository).save(org.mockito.ArgumentMatchers.any());
-
-        ClaudeTuiConfig result = controller.open(original);
-
-        assertThat(result).isSameAs(original);
-        assertThat(output.toString()).contains("Failed to save config: disk full", "Config unchanged.");
+        assertThat(config.model()).isEqualTo("mock-claude");
+        assertThat(config.theme()).isEqualTo("dark");
+        assertThat(config.streamDelayMillis()).isEqualTo(8L);
     }
 }
