@@ -29,4 +29,16 @@ class StreamingPrinterTest {
             .isEqualTo("claude > line one" + System.lineSeparator()
                 + "         line two" + System.lineSeparator());
     }
+
+    @Test
+    void createsCopyWithUpdatedDelay() {
+        StringWriter output = new StringWriter();
+        StreamingPrinter original = new StreamingPrinter(new PrintWriter(output), 0L);
+
+        StreamingPrinter updated = original.withDelayMillis(0L);
+        updated.printAssistantMessage("copied");
+
+        assertThat(updated).isNotSameAs(original);
+        assertThat(output.toString()).isEqualTo("claude > copied" + System.lineSeparator());
+    }
 }

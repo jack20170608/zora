@@ -15,19 +15,25 @@ final class ClaudeCuiShell {
     private final Terminal terminal;
     private final ClaudeCuiCommandParser commandParser;
     private final MockAssistant assistant;
-    private final StreamingPrinter streamingPrinter;
+    private final ConfigMenuController configMenuController;
+    private ClaudeCuiConfig config;
+    private StreamingPrinter streamingPrinter;
 
     ClaudeCuiShell(
         LineReader lineReader,
         Terminal terminal,
         ClaudeCuiCommandParser commandParser,
         MockAssistant assistant,
-        StreamingPrinter streamingPrinter) {
+        StreamingPrinter streamingPrinter,
+        ConfigMenuController configMenuController,
+        ClaudeCuiConfig config) {
         this.lineReader = lineReader;
         this.terminal = terminal;
         this.commandParser = commandParser;
         this.assistant = assistant;
         this.streamingPrinter = streamingPrinter;
+        this.configMenuController = configMenuController;
+        this.config = config;
     }
 
     void run() {
@@ -59,8 +65,8 @@ final class ClaudeCuiShell {
                 yield state;
             }
             case CONFIG -> {
-                writer().println("Configuration is not implemented yet.");
-                writer().flush();
+                config = configMenuController.open(config);
+                streamingPrinter = streamingPrinter.withDelayMillis(config.streamDelayMillis());
                 yield state;
             }
             case EXIT -> state.exit();
@@ -89,10 +95,12 @@ final class ClaudeCuiShell {
 
     private void printHelp() {
         writer().println("Commands:");
-        writer().println("  :help   Show this help message");
-        writer().println("  :clear  Clear the terminal and show the welcome banner");
-        writer().println("  :exit   Exit the shell");
-        writer().println("  :quit   Exit the shell");
+        writer().println("  :help    Show this help message");
+        writer().println("  :clear   Clear the terminal and show the welcome banner");
+        writer().println("  :config  Open the configuration menu");
+        writer().println("  /config  Open the configuration menu");
+        writer().println("  :exit    Exit the shell");
+        writer().println("  :quit    Exit the shell");
         writer().flush();
     }
 

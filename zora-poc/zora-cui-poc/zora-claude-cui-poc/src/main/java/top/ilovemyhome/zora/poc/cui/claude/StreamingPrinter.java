@@ -22,6 +22,10 @@ final class StreamingPrinter {
         this.delayMillis = delayMillis;
     }
 
+    StreamingPrinter withDelayMillis(long delayMillis) {
+        return new StreamingPrinter(writer, delayMillis);
+    }
+
     void printAssistantMessage(String message) {
         String safeMessage = message == null ? "" : message;
         String[] lines = safeMessage.split("\\R", -1);
