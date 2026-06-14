@@ -21,7 +21,9 @@
       "Read(//d/project-ai/use-ai/zora/$HOME/.m2/repository/top/ilovemyhome/zora/**)",
       "Skill(superpowers:brainstorming)",
       "Skill(superpowers:writing-plans)",
-      "Skill(claude-api)"
+      "Skill(claude-api)",
+      "Skill(update-config)",
+      "Bash(rtk *)"
     ]
   }
 }

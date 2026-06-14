@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn *)",
+      "Edit(.claude/**)",
+      "Write(.claude/**)",
+      "Bash(python *)",
+      "Edit",
+      "Bash(jq *)"
+    ]
+  }
+}
