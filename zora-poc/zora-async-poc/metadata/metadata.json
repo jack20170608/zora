@@ -1,0 +1,1 @@
+{"groupId": "@project.groupId@", "artifactId": "@project.artifactId@", "description": "@project.description@", "version": "@project.version@", "scmUrl": "@project.scmUrl@"}
