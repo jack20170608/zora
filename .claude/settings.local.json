@@ -23,7 +23,8 @@
       "Skill(superpowers:writing-plans)",
       "Skill(claude-api)",
       "Skill(update-config)",
-      "Bash(rtk *)"
+      "Bash(rtk *)",
+      "Bash(rtk mvn *)"
     ]
   }
 }

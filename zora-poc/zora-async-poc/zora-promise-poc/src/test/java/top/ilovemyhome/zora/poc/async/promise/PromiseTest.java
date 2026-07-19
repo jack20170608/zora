@@ -71,7 +71,7 @@ public class PromiseTest {
     private static void testBasicReject() {
         System.out.println("\n--- Test: Basic Reject ---");
         Promise<Integer> promise = new Promise<>((resolve, reject) -> {
-            reject.resolve("Error occurred");
+            reject.reject("Error occurred");
         });
 
         promise.catchError(reason -> {
@@ -92,11 +92,11 @@ public class PromiseTest {
         promise
             .then(value -> {
                 System.out.println("Step 1: " + value);
-                return value * 2;  // 20
+                return (Integer) value * 2;  // 20
             })
             .then(value -> {
                 System.out.println("Step 2: " + value);
-                return value + 5;  // 25
+                return (Integer) value + 5;  // 25
             })
             .then(value -> {
                 System.out.println("Step 3: " + value);
@@ -170,7 +170,7 @@ public class PromiseTest {
             resolve.resolve("Slow");
         });
 
-        List<Promise<?>> promises = Arrays.asList(slow, fast);
+        List<Promise<?>> promises = Arrays.asList(fast, slow);
         Promise.race(promises).then(result -> {
             System.out.println("Promise.race winner: " + result);
             return null;

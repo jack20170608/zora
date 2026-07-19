@@ -11,5 +11,5 @@ public interface PromiseExecutor<T> {
      * @param resolve 处理成功结果的函数
      * @param reject 处理失败原因的函数
      */
-    void execute(PromiseResolver<T> resolve, PromiseRejecter reject);
+    void execute(PromiseResolver resolve, PromiseRejecter reject);
 }

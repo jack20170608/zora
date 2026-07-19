@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * 用法示例：
  * <pre>
- * Promise<Integer> promise = new Promise<((resolve, reject) -> {
+ * Promise<Integer> promise = new Promise<>((resolve, reject) -> {
  *     resolve.resolve(42);
  * });
  * promise.then(value -> {
@@ -40,13 +40,16 @@ public class Promise<T> {
     private PromiseState state = PromiseState.PENDING;
 
     // resolve的值或reject的原因
-    private Object result;
+    private Object value;
+
+    // 标记是否已经settle，防止多次settle
+    private boolean settled = false;
 
     // 保存注册的成功回调
-    private final List<PromiseConsumer<? super T>> onFulfilledCallbacks = new ArrayList<>();
+    private final List<PromiseCallback> onFulfilledCallbacks = new ArrayList<>();
 
     // 保存注册的失败回调
-    private final List<PromiseRejecter> onRejectedCallbacks = new ArrayList<>();
+    private final List<PromiseCallback> onRejectedCallbacks = new ArrayList<>();
 
     // 线程池（单线程模拟微任务队列）
     private static final ExecutorService microTaskExecutor = Executors.newSingleThreadExecutor(r -> {
@@ -59,7 +62,6 @@ public class Promise<T> {
      * 创建一个新的Promise
      * @param executor 执行器函数
      */
-    @SuppressWarnings("unchecked")
     public Promise(PromiseExecutor<T> executor) {
         if (executor == null) {
             throw new IllegalArgumentException("Executor cannot be null");
@@ -68,12 +70,12 @@ public class Promise<T> {
         try {
             executor.execute(
                 // resolve函数
-                value -> resolve((T) value),
+                value -> doResolve(value),
                 // reject函数
-                reason -> reject(reason)
+                reason -> doReject(reason)
             );
         } catch (Throwable e) {
-            reject(e);
+            doReject(e);
         }
     }
 
@@ -88,7 +90,7 @@ public class Promise<T> {
     private Promise(Promise<?> parent) {
         // 继承父Promise的状态
         this.state = parent.state;
-        this.result = parent.result;
+        this.value = parent.value;
     }
 
     /**
@@ -98,7 +100,7 @@ public class Promise<T> {
     public static <T> Promise<T> resolve(Object value) {
         Promise<T> promise = new Promise<>();
         promise.state = PromiseState.FULFILLED;
-        promise.result = value;
+        promise.value = value;
         return promise;
     }
 
@@ -109,7 +111,7 @@ public class Promise<T> {
     public static <T> Promise<T> reject(Object reason) {
         Promise<T> promise = new Promise<>();
         promise.state = PromiseState.REJECTED;
-        promise.result = reason;
+        promise.value = reason;
         return promise;
     }
 
@@ -122,7 +124,7 @@ public class Promise<T> {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Promise<List<?>> all(List<? extends Promise<?>> promises) {
-        return new Promise((resolve, reject) -> {
+        return new Promise<>((resolve, reject) -> {
             if (promises == null || promises.isEmpty()) {
                 resolve.resolve(Collections.emptyList());
                 return;
@@ -147,8 +149,8 @@ public class Promise<T> {
                         resolve.resolve(results);
                     }
                     return null;
-                }).catchError(reason -> {
-                    reject.resolve(reason);
+                }, reason -> {
+                    reject.reject(reason);
                     return null;
                 });
             }
@@ -161,18 +163,27 @@ public class Promise<T> {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Promise<Object> race(List<? extends Promise<?>> promises) {
-        return new Promise((resolve, reject) -> {
+        return new Promise<>((resolve, reject) -> {
             if (promises == null || promises.isEmpty()) {
                 // 空数组会永远pending，这是JavaScript的行为
                 return;
             }
 
+            // race需要一个标志来确保只有第一个结果被采用
+            final boolean[] settled = {false};
+
             for (Promise<?> promise : promises) {
                 promise.then(value -> {
-                    resolve.resolve(value);
+                    if (!settled[0]) {
+                        settled[0] = true;
+                        resolve.resolve(value);
+                    }
                     return null;
-                }).catchError(reason -> {
-                    reject.resolve(reason);
+                }, reason -> {
+                    if (!settled[0]) {
+                        settled[0] = true;
+                        reject.reject(reason);
+                    }
                     return null;
                 });
             }
@@ -187,7 +198,7 @@ public class Promise<T> {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Promise<List<?>> allSettled(List<? extends Promise<?>> promises) {
-        return new Promise((resolve, reject) -> {
+        return new Promise<>((resolve, reject) -> {
             if (promises == null || promises.isEmpty()) {
                 resolve.resolve(Collections.emptyList());
                 return;
@@ -213,7 +224,7 @@ public class Promise<T> {
                         resolve.resolve(results);
                     }
                     return null;
-                }).catchError(reason -> {
+                }, reason -> {
                     results.set(index, new PromiseResult(PromiseState.REJECTED, reason));
                     if (counter.incrementAndGet() == total) {
                         resolve.resolve(results);
@@ -230,10 +241,10 @@ public class Promise<T> {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Promise<Object> any(List<? extends Promise<?>> promises) {
-        return new Promise((resolve, reject) -> {
+        return new Promise<>((resolve, reject) -> {
             if (promises == null || promises.isEmpty()) {
                 // AggregateError
-                reject.resolve(new Throwable("All promises were rejected"));
+                reject.reject(new Throwable("All promises were rejected"));
                 return;
             }
 
@@ -244,10 +255,10 @@ public class Promise<T> {
                 promise.then(value -> {
                     resolve.resolve(value);
                     return null;
-                }).catchError(reason -> {
+                }, reason -> {
                     if (counter.incrementAndGet() == total) {
                         // 全部失败
-                        reject.resolve(new Throwable("All promises were rejected"));
+                        reject.reject(new Throwable("All promises were rejected"));
                     }
                     return null;
                 });
@@ -265,8 +276,7 @@ public class Promise<T> {
      * @param onRejected 失败回调
      * @return 新的Promise（支持链式调用）
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public Promise<?> then(PromiseConsumer<? super T> onFulfilled, PromiseRejecter onRejected) {
+    public Promise<?> then(PromiseCallback onFulfilled, PromiseCallback onRejected) {
         // 创建新的Promise
         Promise<?> nextPromise = new Promise<>(this);
 
@@ -277,28 +287,35 @@ public class Promise<T> {
                 onFulfilledCallbacks.add(value -> {
                     try {
                         // 调用回调并处理返回值（可能是普通值或Promise）
-                        Object result = onFulfilled.accept((T) value);
-                        nextPromise.resolve(result);
+                        Object result = onFulfilled.invoke(value);
+                        nextPromise.doResolve(result);
                     } catch (Throwable e) {
-                        nextPromise.reject(e);
+                        nextPromise.doReject(e);
                     }
                     return null;
                 });
+            } else {
+                // 没有onFulfilled，直接传递值
+                onFulfilledCallbacks.add(value -> {
+                    nextPromise.doResolve(value);
+                    return null;
+                });
             }
+
             if (onRejected != null) {
-                onRejectedCallbacks.add(reason -> {
+                onRejectedCallbacks.add(value -> {
                     try {
-                        Object result = onRejected.accept(reason);
-                        nextPromise.resolve(result);
+                        Object result = onRejected.invoke(value);
+                        nextPromise.doResolve(result);
                     } catch (Throwable e) {
-                        nextPromise.reject(e);
+                        nextPromise.doReject(e);
                     }
                     return null;
                 });
             } else {
                 // 如果没有onRejected，将错误传递给下一个Promise
-                onRejectedCallbacks.add(reason -> {
-                    nextPromise.reject(reason);
+                onRejectedCallbacks.add(value -> {
+                    nextPromise.doReject(value);
                     return null;
                 });
             }
@@ -307,30 +324,30 @@ public class Promise<T> {
             if (onFulfilled != null) {
                 scheduleMicroTask(() -> {
                     try {
-                        Object result = onFulfilled.accept((T) result);
-                        nextPromise.resolve(result);
+                        Object result = onFulfilled.invoke(this.value);
+                        nextPromise.doResolve(result);
                     } catch (Throwable e) {
-                        nextPromise.reject(e);
+                        nextPromise.doReject(e);
                     }
                 });
             } else {
                 // 没有onFulfilled，直接传递值
-                nextPromise.resolve(result);
+                scheduleMicroTask(() -> nextPromise.doResolve(this.value));
             }
         } else if (state == PromiseState.REJECTED) {
             // 已经rejected，异步执行onRejected
             if (onRejected != null) {
                 scheduleMicroTask(() -> {
                     try {
-                        Object result = onRejected.accept(result);
-                        nextPromise.resolve(result);
+                        Object result = onRejected.invoke(this.value);
+                        nextPromise.doResolve(result);
                     } catch (Throwable e) {
-                        nextPromise.reject(e);
+                        nextPromise.doReject(e);
                     }
                 });
             } else {
                 // 没有onRejected，传递错误
-                nextPromise.reject(result);
+                scheduleMicroTask(() -> nextPromise.doReject(this.value));
             }
         }
 
@@ -338,10 +355,18 @@ public class Promise<T> {
     }
 
     /**
+     * 只注册onFulfilled回调（简写）
+     * 对应JavaScript: promise.then(onFulfilled)
+     */
+    public Promise<?> then(PromiseCallback onFulfilled) {
+        return then(onFulfilled, null);
+    }
+
+    /**
      * 只注册rejected回调（简写）
      * 对应JavaScript: promise.catch(onRejected)
      */
-    public Promise<?> catchError(PromiseRejecter onRejected) {
+    public Promise<?> catchError(PromiseCallback onRejected) {
         return then(null, onRejected);
     }
 
@@ -371,9 +396,8 @@ public class Promise<T> {
     /**
      * 解决Promise（内部使用）
      */
-    @SuppressWarnings("unchecked")
-    private void resolve(T value) {
-        if (state != PromiseState.PENDING) {
+    private void doResolve(Object value) {
+        if (settled) {
             return;
         }
 
@@ -382,10 +406,10 @@ public class Promise<T> {
         if (isPromiseLike(value)) {
             Promise<?> nestedPromise = (Promise<?>) value;
             nestedPromise.then(v -> {
-                fulfill(v);
+                doResolve(v);
                 return null;
-            }).catchError(e -> {
-                reject(e);
+            }, e -> {
+                doReject(e);
                 return null;
             });
         } else {
@@ -396,13 +420,13 @@ public class Promise<T> {
     /**
      * 拒绝Promise（内部使用）
      */
-    @SuppressWarnings("unchecked")
-    private void reject(Object reason) {
-        if (state != PromiseState.PENDING) {
+    private void doReject(Object reason) {
+        if (settled) {
             return;
         }
+        settled = true;
         state = PromiseState.REJECTED;
-        this.result = reason;
+        this.value = reason;
 
         // 执行onRejected回调
         executeCallbacks(onRejectedCallbacks, reason);
@@ -412,11 +436,12 @@ public class Promise<T> {
      * 完成Promise（内部使用）
      */
     private void fulfill(Object value) {
-        if (state != PromiseState.PENDING) {
+        if (settled) {
             return;
         }
+        settled = true;
         state = PromiseState.FULFILLED;
-        this.result = value;
+        this.value = value;
 
         // 执行onFulfilled回调
         executeCallbacks(onFulfilledCallbacks, value);
@@ -436,10 +461,16 @@ public class Promise<T> {
     /**
      * 执行回调队列
      */
-    private void executeCallbacks(List<? extends java.util.function.Consumer<Object>> callbacks, Object value) {
-        for (java.util.function.Consumer<Object> callback : callbacks) {
+    private void executeCallbacks(List<PromiseCallback> callbacks, Object value) {
+        for (PromiseCallback callback : callbacks) {
             final Object finalValue = value;
-            scheduleMicroTask(() -> callback.accept(finalValue));
+            scheduleMicroTask(() -> {
+                try {
+                    callback.invoke(finalValue);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            });
         }
     }
 
@@ -472,8 +503,8 @@ public class Promise<T> {
     /**
      * 获取结果（用于调试）
      */
-    public Object getResult() {
-        return result;
+    public Object getValue() {
+        return value;
     }
 
     /**
