@@ -11,7 +11,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>zora-completablefuture-poc</artifactId>
+    <artifactId>zora-promise-poc</artifactId>
     <name>zora-completablefuture-poc - CompletableFuture Exploration</name>
     <description>POC sub-module for exploring Java CompletableFuture features and patterns.
         All code lives in test scope and is not packaged into production artifacts.
