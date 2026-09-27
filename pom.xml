@@ -95,6 +95,7 @@
         <module>zora-muserver</module>
         <module>zora-httpclient</module>
         <module>zora-cli-tools</module>
+        <module>zora-bin</module>
         <module>zora-json</module>
         <module>zora-static</module>
         <module>zora-rdb</module>

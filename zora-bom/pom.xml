@@ -64,6 +64,11 @@
             </dependency>
             <dependency>
                 <groupId>top.ilovemyhome.zora</groupId>
+                <artifactId>zora-bin</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.ilovemyhome.zora</groupId>
                 <artifactId>zora-flyway-cli</artifactId>
                 <version>${project.version}</version>
             </dependency>
