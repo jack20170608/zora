@@ -56,6 +56,9 @@ bash app/active/bin/deploy.sh 1.1 app.jar
 [[ "$(readlink app/active)" == 1.1 ]] || fail "new release not activated"
 [[ -f app/1.0/app.jar && -f app/1.1/app.jar ]] || fail "old release not retained"
 bash app/active/bin/status.sh || fail "new release must be running"
+if bash app/active/bin/deploy.sh 1.1 app.jar; then fail "existing release must not be overwritten"; fi
+if bash app/active/bin/deploy.sh ../other app.jar; then fail "invalid version must be rejected"; fi
+[[ "$(readlink app/active)" == 1.1 ]] || fail "rejected release changed active"
 if bash app/active/bin/deploy.sh 2.0 app.jar; then fail "failed startup must roll back"; fi
 [[ "$(readlink app/active)" == 1.1 ]] || fail "failed release not rolled back"
 bash app/active/bin/status.sh || fail "old release must be restarted"

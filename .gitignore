@@ -18,6 +18,7 @@ buildNumber.properties
 .vscode/
 .settings/
 bin/
+!zora-bin/src/main/resources/bin/
 *.class
 
 # Eclipse
