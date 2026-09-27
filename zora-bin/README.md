@@ -6,6 +6,7 @@
 
 ```text
 my-app/
+├── env.tag               # 环境标记文件(sit,uat,prod等, 可选, 如果没有的话从环境变量中读取APP_ENV)
 ├── active -> 1.2/        # 当前版本软链
 ├── 1.0/
 ├── 1.1/
@@ -13,10 +14,10 @@ my-app/
 │   ├── app.jar
 │   ├── lib/               # 可选的应用依赖
 │   ├── config/            # 可选的配置
-│       ├── setenv.sh      # 可选的环境变量设置
-│       ├── setenv-sit.sh  # 可选的环境变量设置（SIT 环境）
-│       ├── setenv-prod.sh  # 可选的环境变量设置（PROD 环境）
-│       ├── application.sh  # 可选的应用配置
+│       ├── setenv            # 可选的环境变量设置
+│       ├── setenv-sit        # 可选的环境变量设置（SIT 环境）
+│       ├── setenv-prod       # 可选的环境变量设置（PROD 环境）
+│       ├── application.sh    # 可选的应用配置
 │       └── application-sit.conf  # 可选的应用配置(SIT 环境)
 │   └── bin/
 │       ├── lifecycle.sh
