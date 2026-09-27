@@ -42,12 +42,12 @@ my-app/active/bin/stop.sh
 
 | 环境变量 | 默认值 | 含义 |
 | --- | --- | --- |
-| `ZORA_APP_HOME` | 版本目录的上一级 | 应用部署根目录，建议绝对路径 |
-| `ZORA_APP_JAR` | `$ZORA_APP_HOME/active/app.jar` | 要运行的 JAR，必须是绝对路径 |
+| `APP_HOME` | 版本目录的上一级 | 应用部署根目录，建议绝对路径 |
+| `ZORA_APP_JAR` | `$APP_HOME/active/app.jar` | 要运行的 JAR，必须是绝对路径 |
 | `ZORA_JAVA_CMD` | `java` | Java 可执行程序路径或命令 |
 | `ZORA_JAVA_OPTS` | 空 | 空格分隔的 JVM 选项；含空格的选项请使用 Java argfile（如 `@/path/options.txt`） |
-| `ZORA_RUN_DIR` | `$ZORA_APP_HOME/run` | PID 和锁目录 |
-| `ZORA_LOG_DIR` | `$ZORA_APP_HOME/logs` | 日志目录 |
+| `ZORA_RUN_DIR` | `$APP_HOME/run` | PID 和锁目录 |
+| `ZORA_LOG_DIR` | `$APP_HOME/logs` | 日志目录 |
 | `ZORA_STOP_TIMEOUT` | `30` | 等待优雅停止的秒数 |
 
 运行参数可直接传给 `start.sh`；例如 `start.sh --server.port=8080`。应用需自行处理 SIGTERM 以实现优雅退出。
@@ -67,15 +67,15 @@ MY_APP_REGION=default
 MY_APP_REGION=sit
 ```
 
-这些文件按 Bash 脚本执行，普通赋值和 `export` 赋值都会传给 Java 进程；后加载的环境专属文件可覆盖通用值。`APP_ENV` 最终保持为 `env.tag` 或调用环境选定的值。只应部署受信任的配置文件；`application.sh` / `application-sit.conf` 等应用自有配置不会被脚本自动执行，可通过 `setenv` 指定路径让应用读取。`setenv` 不应修改 `ZORA_APP_HOME`、`ZORA_RUN_DIR` 等生命周期管理路径（它们在加载前已确定）。
+这些文件按 Bash 脚本执行，普通赋值和 `export` 赋值都会传给 Java 进程；后加载的环境专属文件可覆盖通用值。`APP_ENV` 最终保持为 `env.tag` 或调用环境选定的值。只应部署受信任的配置文件；`application.sh` / `application-sit.conf` 等应用自有配置不会被脚本自动执行，可通过 `setenv` 指定路径让应用读取。`setenv` 不应修改 `APP_HOME`、`ZORA_RUN_DIR` 等生命周期管理路径（它们在加载前已确定）。
 
 ## 发布及回退
 
-首次发布时，从解压到 `target/dist/bin/` 的脚本执行发布（`ZORA_APP_HOME` 指向应用根目录）；由于此前没有运行中的版本，首次发布不会自动启动应用：
+首次发布时，从解压到 `target/dist/bin/` 的脚本执行发布（`APP_HOME` 指向应用根目录）；由于此前没有运行中的版本，首次发布不会自动启动应用：
 
 ```bash
 mkdir -p my-app
-ZORA_APP_HOME="$(cd my-app && pwd -P)" bash target/dist/bin/deploy.sh 1.0 /path/to/my-app-1.0.jar
+APP_HOME="$(cd my-app && pwd -P)" bash target/dist/bin/deploy.sh 1.0 /path/to/my-app-1.0.jar
 my-app/active/bin/start.sh
 ```
 

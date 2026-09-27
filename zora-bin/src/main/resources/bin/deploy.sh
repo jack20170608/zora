@@ -11,13 +11,13 @@ link=""
 
 switch_active() {
     local version="$1"
-    link="$ZORA_APP_HOME/.active.$$"
+    link="$APP_HOME/.active.$$"
     [[ ! -e "$link" && ! -L "$link" ]] || zora_error "temporary link already exists: $link"
     ln -s -- "$version" "$link"
     if [[ "$(uname -s)" == Darwin ]]; then
-        mv -fh -- "$link" "$ZORA_APP_HOME/active"
+        mv -fh -- "$link" "$APP_HOME/active"
     else
-        mv -fT -- "$link" "$ZORA_APP_HOME/active"
+        mv -fT -- "$link" "$APP_HOME/active"
     fi
     link=""
 }
@@ -30,10 +30,10 @@ cleanup() {
         if [[ -n "$previous" ]]; then
             switch_active "$previous" || true
             if [[ "$was_running" == true ]]; then
-                ZORA_DEPLOY_IN_PROGRESS=1 bash "$ZORA_APP_HOME/active/bin/start.sh" || true
+                ZORA_DEPLOY_IN_PROGRESS=1 bash "$APP_HOME/active/bin/start.sh" || true
             fi
         else
-            rm -f -- "$ZORA_APP_HOME/active"
+            rm -f -- "$APP_HOME/active"
         fi
     fi
     [[ -z "$link" ]] || rm -f -- "$link"
@@ -57,28 +57,28 @@ main() {
         zora_error "usage: deploy.sh VERSION JAR [LIB_DIR|-] [CONFIG_DIR] | deploy.sh --activate VERSION"
     fi
     [[ "$version" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ && "$version" != *..* ]] || zora_error "invalid version: $version"
-    [[ -d "$ZORA_APP_HOME" ]] || zora_error "application root not found: $ZORA_APP_HOME"
-    target="$ZORA_APP_HOME/$version"
+    [[ -d "$APP_HOME" ]] || zora_error "application root not found: $APP_HOME"
+    target="$APP_HOME/$version"
     if [[ -n "$jar" ]]; then
         [[ ! -e "$target" && ! -L "$target" ]] || zora_error "release already exists: $target"
     else
         [[ -f "$target/app.jar" && -f "$target/bin/start.sh" ]] || zora_error "release is incomplete: $target"
     fi
-    [[ ! -e "$ZORA_APP_HOME/active" || -L "$ZORA_APP_HOME/active" ]] || zora_error "active must be a symbolic link"
+    [[ ! -e "$APP_HOME/active" || -L "$APP_HOME/active" ]] || zora_error "active must be a symbolic link"
 
     mkdir -p -- "$ZORA_RUN_DIR"
     mkdir -- "$ZORA_DEPLOY_LOCK" 2>/dev/null || zora_error "deployment already in progress"
     trap 'cleanup $?' EXIT
     [[ ! -d "$ZORA_LOCK_DIR" ]] || zora_error "lifecycle operation already in progress"
 
-    if [[ -L "$ZORA_APP_HOME/active" ]]; then
-        old_path="$(cd -- "$ZORA_APP_HOME/active" && pwd -P)" || zora_error "active is a broken link"
-        [[ "$(dirname -- "$old_path")" == "$ZORA_APP_HOME" ]] || zora_error "active points outside application root"
+    if [[ -L "$APP_HOME/active" ]]; then
+        old_path="$(cd -- "$APP_HOME/active" && pwd -P)" || zora_error "active is a broken link"
+        [[ "$(dirname -- "$old_path")" == "$APP_HOME" ]] || zora_error "active points outside application root"
         previous="$(basename -- "$old_path")"
     fi
 
     if [[ -n "$jar" ]]; then
-        staging="$(mktemp -d "$ZORA_APP_HOME/.deploy.XXXXXXXX")"
+        staging="$(mktemp -d "$APP_HOME/.deploy.XXXXXXXX")"
         mkdir -- "$staging/bin"
         cp -- "$jar" "$staging/app.jar"
         cp -- "$ZORA_BIN_DIR"/*.sh "$staging/bin/"
@@ -96,12 +96,12 @@ main() {
     if pid="$(zora_pid)" && zora_is_running "$pid"; then
         was_running=true
         [[ -n "$previous" ]] || zora_error "cannot stop an untracked release"
-        ZORA_DEPLOY_IN_PROGRESS=1 bash "$ZORA_APP_HOME/active/bin/stop.sh"
+        ZORA_DEPLOY_IN_PROGRESS=1 bash "$APP_HOME/active/bin/stop.sh"
     fi
     switched=true
     switch_active "$version"
     if [[ "$was_running" == true ]]; then
-        ZORA_DEPLOY_IN_PROGRESS=1 bash "$ZORA_APP_HOME/active/bin/start.sh"
+        ZORA_DEPLOY_IN_PROGRESS=1 bash "$APP_HOME/active/bin/start.sh"
     fi
     echo "Active release: $version"
 }

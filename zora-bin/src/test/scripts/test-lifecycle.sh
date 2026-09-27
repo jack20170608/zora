@@ -83,4 +83,8 @@ bash app/active/bin/stop.sh
 printf '../outside\n' > app/env.tag
 if bash app/active/bin/start.sh; then fail "invalid env.tag must reject startup"; fi
 if bash app/active/bin/status.sh; then fail "invalid tag must not start the process"; fi
+mkdir -- "$TEMP_DIR/bootstrap"
+APP_HOME="$TEMP_DIR/bootstrap" bash "$BIN_DIR/deploy.sh" 3.0 "$TEMP_DIR/app.jar"
+[[ "$(readlink "$TEMP_DIR/bootstrap/active")" == 3.0 ]] || fail "APP_HOME override must direct initial deployment"
+[[ -f "$TEMP_DIR/bootstrap/3.0/bin/start.sh" ]] || fail "APP_HOME override must install release scripts"
 echo "Lifecycle tests passed"

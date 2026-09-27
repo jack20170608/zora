@@ -3,11 +3,11 @@
 set -euo pipefail
 
 readonly ZORA_BIN_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ZORA_APP_HOME="${ZORA_APP_HOME:-$(cd -- "$ZORA_BIN_DIR/../.." && pwd -P)}"
-ZORA_APP_JAR="${ZORA_APP_JAR:-$ZORA_APP_HOME/active/app.jar}"
+APP_HOME="${APP_HOME:-$(cd -- "$ZORA_BIN_DIR/../.." && pwd -P)}"
+ZORA_APP_JAR="${ZORA_APP_JAR:-$APP_HOME/active/app.jar}"
 ZORA_JAVA_CMD="${ZORA_JAVA_CMD:-java}"
-ZORA_RUN_DIR="${ZORA_RUN_DIR:-$ZORA_APP_HOME/run}"
-ZORA_LOG_DIR="${ZORA_LOG_DIR:-$ZORA_APP_HOME/logs}"
+ZORA_RUN_DIR="${ZORA_RUN_DIR:-$APP_HOME/run}"
+ZORA_LOG_DIR="${ZORA_LOG_DIR:-$APP_HOME/logs}"
 ZORA_STOP_TIMEOUT="${ZORA_STOP_TIMEOUT:-30}"
 readonly ZORA_PID_FILE="$ZORA_RUN_DIR/app.pid"
 readonly ZORA_LOCK_DIR="$ZORA_RUN_DIR/.lifecycle.lock"
@@ -20,9 +20,9 @@ zora_error() {
 
 zora_load_environment() {
     local environment="${APP_ENV:-}" config_dir="$ZORA_BIN_DIR/../config" file
-    if [[ -e "$ZORA_APP_HOME/env.tag" || -L "$ZORA_APP_HOME/env.tag" ]]; then
-        [[ -f "$ZORA_APP_HOME/env.tag" && -r "$ZORA_APP_HOME/env.tag" ]] || zora_error "cannot read $ZORA_APP_HOME/env.tag"
-        environment="$(cat -- "$ZORA_APP_HOME/env.tag")"
+    if [[ -e "$APP_HOME/env.tag" || -L "$APP_HOME/env.tag" ]]; then
+        [[ -f "$APP_HOME/env.tag" && -r "$APP_HOME/env.tag" ]] || zora_error "cannot read $APP_HOME/env.tag"
+        environment="$(cat -- "$APP_HOME/env.tag")"
         environment="${environment%$'\r'}"
         [[ -n "$environment" ]] || zora_error "env.tag is empty"
     fi
