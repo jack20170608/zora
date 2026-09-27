@@ -9,6 +9,9 @@ main() {
     if pid="$(zora_pid)" && zora_is_running "$pid"; then
         zora_error "application is already running (PID $pid)"
     fi
+    zora_load_environment
+    ZORA_JAVA_CMD="${ZORA_JAVA_CMD:-java}"
+    zora_validate
     [[ -f "$ZORA_APP_JAR" ]] || zora_error "application JAR not found: $ZORA_APP_JAR"
     jar="$(cd -- "$(dirname -- "$ZORA_APP_JAR")" && pwd -P)/$(basename -- "$ZORA_APP_JAR")"
     command -v "$ZORA_JAVA_CMD" >/dev/null 2>&1 || zora_error "Java command not found: $ZORA_JAVA_CMD"

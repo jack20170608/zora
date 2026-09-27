@@ -6,19 +6,19 @@
 
 ```text
 my-app/
-├── env.tag               # 环境标记文件(sit,uat,prod等, 可选, 如果没有的话从环境变量中读取APP_ENV)
+├── env.tag               # 环境标记文件（如 sit、uat、prod；可选）
 ├── active -> 1.2/        # 当前版本软链
 ├── 1.0/
 ├── 1.1/
 ├── 1.2/
 │   ├── app.jar
 │   ├── lib/               # 可选的应用依赖
-│   ├── config/            # 可选的配置
-│       ├── setenv            # 可选的环境变量设置
-│       ├── setenv-sit        # 可选的环境变量设置（SIT 环境）
-│       ├── setenv-prod       # 可选的环境变量设置（PROD 环境）
-│       ├── application.sh    # 可选的应用配置
-│       └── application-sit.conf  # 可选的应用配置(SIT 环境)
+│   ├── config/            # 可选的版本配置
+│   │   ├── setenv         # 通用环境变量
+│   │   ├── setenv-sit     # SIT 环境变量
+│   │   ├── setenv-prod    # PROD 环境变量
+│   │   ├── application.sh # 应用自有配置（不自动执行）
+│   │   └── application-sit.conf
 │   └── bin/
 │       ├── lifecycle.sh
 │       ├── start.sh
@@ -52,6 +52,23 @@ my-app/active/bin/stop.sh
 
 运行参数可直接传给 `start.sh`；例如 `start.sh --server.port=8080`。应用需自行处理 SIGTERM 以实现优雅退出。
 
+### 启动环境
+
+`env.tag` 位于应用根目录，内容为**单个环境标识**，例如 `sit`（不要写成 `APP_ENV=sit`）。若没有该文件，则使用调用环境已有的 `APP_ENV`；两者都没有时只加载通用配置。环境标识只能包含英文字母、数字、下划线或短横线，首字符须是字母或数字；非法或空的 `env.tag` 会阻止启动。
+
+启动时依次读取**当前版本**的 `config/setenv`、`config/setenv-<环境>`（文件不存在即跳过）。例如：
+
+```bash
+# config/setenv
+ZORA_JAVA_OPTS='-Xms256m -Xmx1g'
+MY_APP_REGION=default
+
+# config/setenv-sit
+MY_APP_REGION=sit
+```
+
+这些文件按 Bash 脚本执行，普通赋值和 `export` 赋值都会传给 Java 进程；后加载的环境专属文件可覆盖通用值。`APP_ENV` 最终保持为 `env.tag` 或调用环境选定的值。只应部署受信任的配置文件；`application.sh` / `application-sit.conf` 等应用自有配置不会被脚本自动执行，可通过 `setenv` 指定路径让应用读取。`setenv` 不应修改 `ZORA_APP_HOME`、`ZORA_RUN_DIR` 等生命周期管理路径（它们在加载前已确定）。
+
 ## 发布及回退
 
 首次发布时，从解压到 `target/dist/bin/` 的脚本执行发布（`ZORA_APP_HOME` 指向应用根目录）；由于此前没有运行中的版本，首次发布不会自动启动应用：
@@ -65,11 +82,12 @@ my-app/active/bin/start.sh
 以后可通过当前版本的脚本发布新版本：
 
 ```bash
-my-app/active/bin/deploy.sh 1.3 /path/to/my-app-1.3.jar /path/to/lib
+my-app/active/bin/deploy.sh 1.3 /path/to/my-app-1.3.jar /path/to/lib /path/to/config
+my-app/active/bin/deploy.sh 1.4 /path/to/my-app-1.4.jar - /path/to/config # 不含 lib
 my-app/active/bin/deploy.sh --activate 1.2   # 回退到已经发布的版本
 ```
 
-`LIB_DIR` 可省略，目录会复制为版本目录的 `lib/`；只有应用自身支持加载 `lib/` 时才需要它（普通 `java -jar` 不会自动加载该目录）。新版本号只允许字母、数字、点、下划线和短横线，且不得包含 `..`；已有版本不可覆盖。发布过程先暂存并复制新版本，再停止当前进程、切换 `active`，如果原进程在运行则启动新版本。新版本启动失败时恢复旧 `active` 并尝试重启旧进程；原先未运行则不自动启动。旧版本目录不会自动删除。进程日志及 PID 始终位于应用根目录。
+`LIB_DIR` 可省略，目录会复制为版本目录的 `lib/`；只有应用自身支持加载 `lib/` 时才需要它（普通 `java -jar` 不会自动加载该目录）。`CONFIG_DIR` 是第四个参数，会复制为版本目录的 `config/`；只有配置目录时第三个参数填 `-`。新版本号只允许字母、数字、点、下划线和短横线，且不得包含 `..`；已有版本不可覆盖。发布过程先暂存并复制新版本，再停止当前进程、切换 `active`，如果原进程在运行则启动新版本。新版本启动失败时恢复旧 `active` 并尝试重启旧进程；原先未运行则不自动启动。旧版本目录不会自动删除。进程日志及 PID、`env.tag` 始终位于应用根目录。
 
 发布与普通启停使用互斥锁；意外中断遗留锁时，需确认没有进行中的操作后手动删除 `run/.deploy.lock` 或 `run/.lifecycle.lock`。生产环境发布前请先备份应用及数据；回退只切换应用版本，不回退数据库。
 

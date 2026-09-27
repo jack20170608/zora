@@ -18,6 +18,40 @@ zora_error() {
     exit 1
 }
 
+zora_load_environment() {
+    local environment="${APP_ENV:-}" config_dir="$ZORA_BIN_DIR/../config" file
+    if [[ -e "$ZORA_APP_HOME/env.tag" || -L "$ZORA_APP_HOME/env.tag" ]]; then
+        [[ -f "$ZORA_APP_HOME/env.tag" && -r "$ZORA_APP_HOME/env.tag" ]] || zora_error "cannot read $ZORA_APP_HOME/env.tag"
+        environment="$(cat -- "$ZORA_APP_HOME/env.tag")"
+        environment="${environment%$'\r'}"
+        [[ -n "$environment" ]] || zora_error "env.tag is empty"
+    fi
+    if [[ -n "$environment" ]]; then
+        [[ "$environment" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || zora_error "invalid environment identifier: $environment"
+        export APP_ENV="$environment"
+    fi
+
+    # These are trusted Bash files. Export plain assignments as well as explicit exports.
+    for file in "$config_dir/setenv" "${config_dir}/setenv-${environment}"; do
+        [[ "$file" != "$config_dir/setenv-" ]] || continue
+        if [[ -e "$file" || -L "$file" ]]; then
+            [[ -f "$file" && -r "$file" ]] || zora_error "cannot read $file"
+            local export_was_enabled=false
+            [[ $- != *a* ]] || export_was_enabled=true
+            set -a
+            # shellcheck source=/dev/null
+            source "$file"
+            if [[ "$export_was_enabled" == false ]]; then
+                set +a
+            fi
+        fi
+    done
+    # The root tag (or supplied APP_ENV) is authoritative over setenv assignments.
+    if [[ -n "$environment" ]]; then
+        export APP_ENV="$environment"
+    fi
+}
+
 zora_validate() {
     [[ "$ZORA_APP_JAR" = /* ]] || zora_error "ZORA_APP_JAR must be an absolute path: $ZORA_APP_JAR"
     [[ "$ZORA_STOP_TIMEOUT" =~ ^[0-9]+$ ]] || zora_error "ZORA_STOP_TIMEOUT must be a non-negative integer"

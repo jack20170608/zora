@@ -42,17 +42,19 @@ cleanup() {
 }
 
 main() {
-    local version jar="" libs="" target pid old_path
+    local version jar="" libs="" config="" target pid old_path
     if [[ "${1:-}" == "--activate" && $# -eq 2 ]]; then
         version="$2"
-    elif [[ $# -eq 2 || $# -eq 3 ]]; then
+    elif [[ $# -ge 2 && $# -le 4 ]]; then
         version="$1"
         jar="$2"
         libs="${3:-}"
+        config="${4:-}"
         [[ -f "$jar" ]] || zora_error "JAR not found: $jar"
-        [[ -z "$libs" || -d "$libs" ]] || zora_error "lib directory not found: $libs"
+        [[ -z "$libs" || "$libs" == "-" || -d "$libs" ]] || zora_error "lib directory not found: $libs"
+        [[ -z "$config" || -d "$config" ]] || zora_error "config directory not found: $config"
     else
-        zora_error "usage: deploy.sh VERSION JAR [LIB_DIR] | deploy.sh --activate VERSION"
+        zora_error "usage: deploy.sh VERSION JAR [LIB_DIR|-] [CONFIG_DIR] | deploy.sh --activate VERSION"
     fi
     [[ "$version" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ && "$version" != *..* ]] || zora_error "invalid version: $version"
     [[ -d "$ZORA_APP_HOME" ]] || zora_error "application root not found: $ZORA_APP_HOME"
@@ -81,8 +83,11 @@ main() {
         cp -- "$jar" "$staging/app.jar"
         cp -- "$ZORA_BIN_DIR"/*.sh "$staging/bin/"
         chmod +x "$staging/bin/"*.sh
-        if [[ -n "$libs" ]]; then
+        if [[ -n "$libs" && "$libs" != "-" ]]; then
             cp -R -- "$libs" "$staging/lib"
+        fi
+        if [[ -n "$config" ]]; then
+            cp -R -- "$config" "$staging/config"
         fi
         mv -- "$staging" "$target"
         staging=""

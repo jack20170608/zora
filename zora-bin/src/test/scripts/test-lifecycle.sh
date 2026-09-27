@@ -23,23 +23,31 @@ fail() {
     exit 1
 }
 
-mkdir -p -- "$TEMP_DIR/app/1.0/bin"
+mkdir -p -- "$TEMP_DIR/app/1.0/bin" "$TEMP_DIR/app/1.0/config" "$TEMP_DIR/new-config"
 cp -- "$BIN_DIR"/*.sh "$TEMP_DIR/app/1.0/bin/"
 : > "$TEMP_DIR/app/1.0/app.jar"
+printf 'sit\n' > "$TEMP_DIR/app/env.tag"
+printf 'ZORA_TEST_VALUE=general\n' > "$TEMP_DIR/app/1.0/config/setenv"
+printf 'ZORA_TEST_VALUE=sit\nAPP_ENV=incorrect\n' > "$TEMP_DIR/app/1.0/config/setenv-sit"
+printf 'ZORA_TEST_VALUE=deployed\n' > "$TEMP_DIR/new-config/setenv-sit"
 ln -s 1.0 "$TEMP_DIR/app/active"
 cat > "$TEMP_DIR/fake-java" <<'FAKE_JAVA'
 #!/bin/bash
 trap 'exit 0' TERM
+printf '%s:%s\n' "${APP_ENV:-}" "${ZORA_TEST_VALUE:-}" > "$TEST_CAPTURE"
 if [[ "$2" == */2.0/app.jar ]]; then exit 1; fi
 while :; do sleep 1; done
 FAKE_JAVA
 chmod +x "$TEMP_DIR/fake-java"
 export ZORA_JAVA_CMD="$TEMP_DIR/fake-java"
 export ZORA_STOP_TIMEOUT=5
+export TEST_CAPTURE="$TEMP_DIR/launch.env"
+export APP_ENV=prod
 
 cd -- "$TEMP_DIR"
 if bash app/active/bin/status.sh; then fail "stopped status must fail"; fi
 bash app/active/bin/start.sh
+[[ "$(cat "$TEST_CAPTURE")" == sit:sit ]] || fail "env.tag and environment-specific setenv must take precedence"
 bash app/active/bin/status.sh || fail "running status must succeed"
 if bash app/active/bin/start.sh; then fail "duplicate start must fail"; fi
 bash app/active/bin/stop.sh
@@ -52,9 +60,11 @@ if bash app/active/bin/stop.sh; then fail "unrelated PID must not be stopped"; f
 bash app/active/bin/start.sh
 [[ "$(sed -n '2p' app/run/app.pid)" == "$TEMP_DIR/app/1.0/app.jar" ]] || fail "PID file must pin release"
 : > app.jar
-bash app/active/bin/deploy.sh 1.1 app.jar
+bash app/active/bin/deploy.sh 1.1 app.jar - new-config
 [[ "$(readlink app/active)" == 1.1 ]] || fail "new release not activated"
 [[ -f app/1.0/app.jar && -f app/1.1/app.jar ]] || fail "old release not retained"
+[[ -f app/1.1/config/setenv-sit ]] || fail "release config not copied"
+[[ "$(cat "$TEST_CAPTURE")" == sit:deployed ]] || fail "deployment must load new release config"
 bash app/active/bin/status.sh || fail "new release must be running"
 if bash app/active/bin/deploy.sh 1.1 app.jar; then fail "existing release must not be overwritten"; fi
 if bash app/active/bin/deploy.sh ../other app.jar; then fail "invalid version must be rejected"; fi
@@ -65,4 +75,12 @@ bash app/active/bin/status.sh || fail "old release must be restarted"
 bash app/active/bin/deploy.sh --activate 1.0
 [[ "$(readlink app/active)" == 1.0 ]] || fail "activation of old release failed"
 bash app/active/bin/stop.sh
+rm -- app/env.tag
+printf 'ZORA_TEST_VALUE=prod\n' > app/1.0/config/setenv-prod
+bash app/active/bin/start.sh
+[[ "$(cat "$TEST_CAPTURE")" == prod:prod ]] || fail "APP_ENV fallback must load matching setenv"
+bash app/active/bin/stop.sh
+printf '../outside\n' > app/env.tag
+if bash app/active/bin/start.sh; then fail "invalid env.tag must reject startup"; fi
+if bash app/active/bin/status.sh; then fail "invalid tag must not start the process"; fi
 echo "Lifecycle tests passed"
