@@ -1,15 +1,9 @@
 package top.ilovemyhome.zora.rdb.flyway;
 
-import org.flywaydb.core.Flyway;
-import org.flywaydb.core.api.MigrationInfo;
-import org.flywaydb.core.api.MigrationVersion;
-import org.flywaydb.core.api.configuration.FluentConfiguration;
-import org.flywaydb.core.api.output.MigrateResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -21,53 +15,14 @@ public class FlywayMigrationRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FlywayMigrationRunner.class);
 
-    private final Flyway flyway;
+    private final SqlMigrationEngine engine;
 
     private FlywayMigrationRunner(Builder builder) {
         Objects.requireNonNull(builder.dataSource, "DataSource cannot be null");
 
-        FluentConfiguration flywayBuilder = Flyway.configure()
-                .dataSource(builder.dataSource);
-
-        // Set locations
-        if (builder.locations != null && builder.locations.length > 0) {
-            flywayBuilder.locations(builder.locations);
-        }
-
-        // Set baseline configuration
-        flywayBuilder.baselineOnMigrate(builder.baselineOnMigrate);
-        if (builder.baselineVersion != null) {
-            flywayBuilder.baselineVersion(builder.baselineVersion);
-        }
-        if (builder.baselineDescription != null) {
-            flywayBuilder.baselineDescription(builder.baselineDescription);
-        }
-
-        // Set other configurations
-        flywayBuilder.cleanOnValidationError(builder.cleanOnValidationError);
-        flywayBuilder.validateOnMigrate(builder.validateOnMigrate);
-        if (builder.targetVersion != null) {
-            flywayBuilder.target(builder.targetVersion);
-        }
-        if (builder.table != null) {
-            flywayBuilder.table(builder.table);
-        }
-
-        if (builder.defaultSchema != null) {
-            flywayBuilder.defaultSchema(builder.defaultSchema);
-        }
-        if (builder.schemas != null && builder.schemas.length > 0) {
-            flywayBuilder.schemas(builder.schemas);
-        }
-
-        // Set placeholders
-        if (builder.placeholders != null && !builder.placeholders.isEmpty()) {
-            flywayBuilder.placeholders(builder.placeholders);
-        }
-
-        this.flyway = flywayBuilder.load();
-
-        LOGGER.info("Flyway configured with locations: {}", Arrays.toString(builder.locations));
+        this.engine = new SqlMigrationEngine(builder.dataSource, builder.locations,
+            builder.targetVersion, builder.table, builder.defaultSchema,
+            builder.placeholders, true, false);
     }
 
     /**
@@ -85,8 +40,8 @@ public class FlywayMigrationRunner {
      *
      * @return Flyway instance
      */
-    public Flyway getFlyway() {
-        return flyway;
+    public SqlMigrationEngine getFlyway() {
+        return engine;
     }
 
     /**
@@ -94,9 +49,9 @@ public class FlywayMigrationRunner {
      *
      * @return migration result
      */
-    public MigrateResult migrate() {
+    public int migrate() {
         LOGGER.info("Starting Flyway database migration...");
-        MigrateResult result = flyway.migrate();
+        int result = engine.migrate();
         LOGGER.info("Flyway migration completed successfully");
         return result;
     }
@@ -107,8 +62,7 @@ public class FlywayMigrationRunner {
      * @return true if there are pending migrations
      */
     public boolean hasPendingMigrations() {
-        MigrationInfo[] pendingMigrations = flyway.info().pending();
-        return pendingMigrations != null && pendingMigrations.length > 0;
+        return engine.pendingCount() > 0;
     }
 
     /**
@@ -117,8 +71,7 @@ public class FlywayMigrationRunner {
      * @return number of pending migrations
      */
     public int getPendingMigrationCount() {
-        MigrationInfo[] pendingMigrations = flyway.info().pending();
-        return pendingMigrations != null ? pendingMigrations.length : 0;
+        return engine.pendingCount();
     }
 
     /**
@@ -126,7 +79,7 @@ public class FlywayMigrationRunner {
      */
     public void validate() {
         LOGGER.info("Validating Flyway migrations...");
-        flyway.validate();
+        engine.validate();
         LOGGER.info("Flyway validation completed successfully");
     }
 
@@ -136,7 +89,7 @@ public class FlywayMigrationRunner {
      */
     public void clean() {
         LOGGER.warn("Cleaning database with Flyway - all objects will be dropped!");
-        flyway.clean();
+        engine.clean();
         LOGGER.info("Database clean completed");
     }
 
@@ -145,7 +98,7 @@ public class FlywayMigrationRunner {
      */
     public void baseline() {
         LOGGER.info("Creating Flyway baseline...");
-        flyway.baseline();
+        engine.baseline();
         LOGGER.info("Flyway baseline created");
     }
 
@@ -156,11 +109,11 @@ public class FlywayMigrationRunner {
         private final DataSource dataSource;
         private String[] locations = new String[]{"classpath:db/migration"};
         private boolean baselineOnMigrate = true;
-        private MigrationVersion baselineVersion = MigrationVersion.fromVersion("1");
+        private String baselineVersion = "1";
         private String baselineDescription = "<< Flyway Baseline >>";
         private boolean cleanOnValidationError = false;
         private boolean validateOnMigrate = true;
-        private MigrationVersion targetVersion;
+        private String targetVersion;
         private String table;
         private String defaultSchema;
         private String[] schemas;
@@ -181,7 +134,7 @@ public class FlywayMigrationRunner {
         }
 
         public Builder baselineVersion(String baselineVersion) {
-            this.baselineVersion = MigrationVersion.fromVersion(baselineVersion);
+            this.baselineVersion = baselineVersion;
             return this;
         }
 
@@ -201,7 +154,7 @@ public class FlywayMigrationRunner {
         }
 
         public Builder targetVersion(String targetVersion) {
-            this.targetVersion = MigrationVersion.fromVersion(targetVersion);
+            this.targetVersion = targetVersion;
             return this;
         }
 

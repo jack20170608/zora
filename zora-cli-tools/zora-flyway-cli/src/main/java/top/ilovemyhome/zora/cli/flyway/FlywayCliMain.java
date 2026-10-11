@@ -1,13 +1,11 @@
 package top.ilovemyhome.zora.cli.flyway;
 
-import org.flywaydb.core.Flyway;
-import org.flywaydb.core.api.FlywayException;
-import org.flywaydb.core.api.MigrationInfo;
-import org.flywaydb.core.api.MigrationVersion;
-import org.flywaydb.core.api.configuration.FluentConfiguration;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
+import top.ilovemyhome.zora.rdb.flyway.SqlMigrationEngine;
 
 import java.io.File;
 import java.util.Map;
@@ -45,8 +43,8 @@ public class FlywayCliMain {
     static class MigrateCommand extends AbstractFlywayCommand {
 
         @Override
-        protected Integer executeFlywayOperation(Flyway flyway) {
-            flyway.migrate();
+        protected Integer executeFlywayOperation(SqlMigrationEngine engine) {
+            engine.migrate();
             LOGGER.info("Database migration completed successfully");
             return 0;
         }
@@ -56,8 +54,8 @@ public class FlywayCliMain {
     static class CleanCommand extends AbstractFlywayCommand {
 
         @Override
-        protected Integer executeFlywayOperation(Flyway flyway) {
-            flyway.clean();
+        protected Integer executeFlywayOperation(SqlMigrationEngine engine) {
+            engine.clean();
             LOGGER.info("Database cleaned successfully");
             return 0;
         }
@@ -67,9 +65,10 @@ public class FlywayCliMain {
     static class InfoCommand extends AbstractFlywayCommand {
 
         @Override
-        protected Integer executeFlywayOperation(Flyway flyway) {
-            for (MigrationInfo info : flyway.info().all()) {
-                LOGGER.info("{} - {} [{}]", info.getVersion(), info.getDescription(), info.getState());
+        protected Integer executeFlywayOperation(SqlMigrationEngine engine) {
+            for (SqlMigrationEngine.MigrationStatus info : engine.info()) {
+                LOGGER.info("{} - {} [{}]", info.version(), info.description(),
+                    info.applied() ? "APPLIED" : "PENDING");
             }
             return 0;
         }
@@ -79,8 +78,8 @@ public class FlywayCliMain {
     static class RepairCommand extends AbstractFlywayCommand {
 
         @Override
-        protected Integer executeFlywayOperation(Flyway flyway) {
-            flyway.repair();
+        protected Integer executeFlywayOperation(SqlMigrationEngine engine) {
+            engine.repair();
             LOGGER.info("Migration history table repaired successfully");
             return 0;
         }
@@ -90,8 +89,8 @@ public class FlywayCliMain {
     static class ValidateCommand extends AbstractFlywayCommand {
 
         @Override
-        protected Integer executeFlywayOperation(Flyway flyway) {
-            flyway.validate();
+        protected Integer executeFlywayOperation(SqlMigrationEngine engine) {
+            engine.validate();
             LOGGER.info("All migrations validated successfully");
             return 0;
         }
@@ -132,49 +131,36 @@ public class FlywayCliMain {
         @Override
         public void run() {
             try {
-                Flyway flyway = buildFlyway();
-                Integer result = executeFlywayOperation(flyway);
+                SqlMigrationEngine engine = buildFlyway();
+                Integer result = executeFlywayOperation(engine);
                 System.exit(result);
-            } catch (FlywayException e) {
-                LOGGER.error("Flyway operation failed: {}", e.getMessage(), e);
+            } catch (RuntimeException e) {
+                LOGGER.error("Database migration operation failed: {}", e.getMessage(), e);
                 System.exit(1);
             }
         }
 
-        protected Flyway buildFlyway() {
-            FluentConfiguration builder = Flyway.configure()
-                    .dataSource(url, username, password)
-                    .locations(locations.split(","));
-
+        protected SqlMigrationEngine buildFlyway() {
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(url);
+            config.setUsername(username);
+            config.setPassword(password);
             if (driver != null) {
-                builder.driver(driver);
+                config.setDriverClassName(driver);
             }
-
-            if (placeholders != null && !placeholders.isEmpty()) {
-                builder.placeholders(placeholders);
-            }
-
-            builder.placeholderReplacement(placeholderReplacement);
-            builder.cleanDisabled(cleanDisabled);
-
-            if (baselineVersion != null) {
-                builder.baselineVersion(MigrationVersion.fromVersion(baselineVersion));
-                builder.baselineOnMigrate(true);
-            }
-
             if (configFile != null && configFile.exists()) {
                 Properties properties = new Properties();
                 try {
                     properties.load(new java.io.FileReader(configFile));
-                    builder.configuration(properties);
+                    locations = properties.getProperty("locations", locations);
                 } catch (Exception e) {
                     LOGGER.warn("Failed to load config file: {}", e.getMessage());
                 }
             }
-
-            return builder.load();
+            return new SqlMigrationEngine(new HikariDataSource(config), locations.split(","),
+                null, null, null, placeholders, placeholderReplacement, cleanDisabled);
         }
 
-        protected abstract Integer executeFlywayOperation(Flyway flyway);
+        protected abstract Integer executeFlywayOperation(SqlMigrationEngine engine);
     }
 }

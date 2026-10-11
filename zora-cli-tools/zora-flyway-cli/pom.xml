@@ -29,10 +29,10 @@
             <artifactId>picocli</artifactId>
         </dependency>
 
-        <!-- Flyway Core -->
+        <!-- Shared database migration runner -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>top.ilovemyhome.zora</groupId>
+            <artifactId>zora-rdb</artifactId>
         </dependency>
 
         <!-- Testing -->
@@ -47,7 +47,7 @@
             <artifactId>junit-jupiter-api</artifactId>
             <scope>test</scope>
         </dependency>
-        
+
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
@@ -67,12 +67,6 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!-- Flyway PostgreSQL database plugin required since Flyway 10+ -->
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-database-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

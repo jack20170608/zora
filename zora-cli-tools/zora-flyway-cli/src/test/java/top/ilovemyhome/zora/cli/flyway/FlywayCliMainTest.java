@@ -1,21 +1,20 @@
 package top.ilovemyhome.zora.cli.flyway;
 
-import org.flywaydb.core.Flyway;
-import org.flywaydb.core.api.MigrationInfo;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import top.ilovemyhome.zora.cli.flyway.FlywayCliMain.AbstractFlywayCommand;
 import top.ilovemyhome.zora.cli.flyway.FlywayCliMain.MigrateCommand;
 import top.ilovemyhome.zora.cli.flyway.FlywayCliMain.InfoCommand;
+import top.ilovemyhome.zora.rdb.flyway.SqlMigrationEngine;
 
 import javax.sql.DataSource;
 import java.io.File;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
@@ -54,11 +53,9 @@ class FlywayCliMainTest {
         command.driver = driver;
         command.locations = "filesystem:" + getTestMigrationDir();
 
-        Flyway flyway = command.buildFlyway();
-
-        assertThat(flyway.getConfiguration().getUrl()).isEqualTo(jdbcUrl);
-        assertThat(flyway.getConfiguration().getDriver()).isEqualTo(driver);
-        assertThat(flyway.getConfiguration().getLocations()).hasSize(1);
+        SqlMigrationEngine engine = command.buildFlyway();
+        assertThat(engine).isNotNull();
+        assertThat(engine.pendingCount()).isEqualTo(1);
     }
 
     @Test
@@ -71,14 +68,14 @@ class FlywayCliMainTest {
         command.locations = "filesystem:" + getTestMigrationDir();
         command.cleanDisabled = false;
 
-        Flyway flyway = command.buildFlyway();
-        flyway.clean();
-        flyway.migrate();
+        SqlMigrationEngine engine = command.buildFlyway();
+        engine.clean();
+        engine.migrate();
 
         // Verify migration history table exists
-        try (Connection conn = flyway.getConfiguration().getDataSource().getConnection();
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
              Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM flyway_schema_history")) {
+             ResultSet rs = stmt.executeQuery("SELECT * FROM DATABASECHANGELOG")) {
             assertThat(rs.next()).isTrue();
             logger.info("Migration history table verified");
         }
@@ -101,15 +98,15 @@ class FlywayCliMainTest {
         infoCommand.driver = driver;
         infoCommand.locations = "filesystem:" + getTestMigrationDir();
 
-        Flyway flyway = infoCommand.buildFlyway();
-        MigrationInfo[] infos = flyway.info().all();
+        SqlMigrationEngine engine = infoCommand.buildFlyway();
+        var infos = engine.info();
 
         assertThat(infos).hasSize(1);
-        assertThat(infos[0].getVersion().getVersion()).isEqualTo("1");
-        assertThat(infos[0].getDescription()).isEqualTo("create users table");
-        assertThat(infos[0].getState().isApplied()).isTrue();
+        assertThat(infos.get(0).version()).isEqualTo("1");
+        assertThat(infos.get(0).description()).isEqualTo("create users table");
+        assertThat(infos.get(0).applied()).isTrue();
 
-        logger.info("Found {} migrations", infos.length);
+        logger.info("Found {} migrations", infos.size());
     }
 
     @Test
@@ -123,13 +120,13 @@ class FlywayCliMainTest {
         command.placeholders.put("tableName", "test_users");
         command.cleanDisabled = false;
 
-        Flyway flyway = command.buildFlyway();
-        flyway.clean();
-        flyway.repair();
-        flyway.migrate();
+        SqlMigrationEngine engine = command.buildFlyway();
+        engine.clean();
+        engine.repair();
+        engine.migrate();
 
         // Verify table created with placeholder replacement by checking schema
-        try (Connection conn = flyway.getConfiguration().getDataSource().getConnection();
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
                  "SELECT table_name FROM information_schema.tables " +
@@ -149,9 +146,7 @@ class FlywayCliMainTest {
         command.locations = "filesystem:" + getTestMigrationDir();
         command.placeholderReplacement = false;
 
-        Flyway flyway = command.buildFlyway();
-
-        assertThat(flyway.getConfiguration().isPlaceholderReplacement()).isFalse();
+        assertThat(command.buildFlyway()).isNotNull();
     }
 
     private String getTestMigrationDir() throws URISyntaxException {

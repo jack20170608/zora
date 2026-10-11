@@ -34,10 +34,10 @@
             <artifactId>HikariCP</artifactId>
         </dependency>
 
-        <!-- Flyway - Database Migration -->
+        <!-- Liquibase - Database Migration -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
         </dependency>
 
         <!-- SLF4J API -->
@@ -91,11 +91,6 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-database-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
