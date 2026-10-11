@@ -7,6 +7,8 @@ import com.typesafe.config.ConfigFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -28,11 +30,24 @@ public final class ConfigLoader {
         return ConfigFactory.parseResources(conf).resolve();
     }
 
-    public static Config loadConfig(String fallbackConf, String conf){
-        Config fallbackConfig = ConfigFactory.parseResources(fallbackConf);
-        Config specConfig = ConfigFactory.parseResources(conf);
-        return specConfig.withFallback(fallbackConfig).resolve();
+    public static Config loadConfig(String rootConf, String fallbackConf){
+        if (ConfigLoader.class.getClassLoader().getResource(fallbackConf) == null) {
+            throw new IllegalStateException("Environment config is missing: " + fallbackConf);
+        }
+        Config defaultConfig = ConfigFactory.parseResources(rootConf);
+        Config specConfig = ConfigFactory.parseResources(fallbackConf);
+        return specConfig.withFallback(defaultConfig).resolve();
     }
+
+    public static Config loadConfig(String rootConf, Path environmentFile) {
+        if (!Files.isRegularFile(environmentFile) || !Files.isReadable(environmentFile)) {
+            throw new IllegalStateException("Environment config is missing or unreadable: " + environmentFile);
+        }
+        return ConfigFactory.parseFile(environmentFile.toFile())
+            .withFallback(ConfigFactory.parseResources(rootConf))
+            .resolve();
+    }
+
 
     /**
      * Load config using Typesafe Config's default loading order:
