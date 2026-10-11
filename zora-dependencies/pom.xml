@@ -20,7 +20,7 @@
         <!-- Third party dependencies versions -->
         <junit.version>5.14.4</junit.version>
         <slf4j.version>2.0.17</slf4j.version>
-        <logback.version>1.5.32</logback.version>
+        <logback.version>1.5.38</logback.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <guava.version>33.6.0-jre</guava.version>
         <flyway.version>11.8.2</flyway.version>
@@ -28,7 +28,7 @@
         <assertj.version>3.27.7</assertj.version>
         <jackson.version>2.21.3</jackson.version>
         <jdbi3.version>3.53.0</jdbi3.version>
-        <muserver.version>2.2.8</muserver.version>
+        <muserver.version>2.4.3</muserver.version>
         <rocksdb.version>9.10.0</rocksdb.version>
         <jline.version>3.30.6</jline.version>
     </properties>
