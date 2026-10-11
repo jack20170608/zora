@@ -1,6 +1,6 @@
 package top.ilovemyhome.zora.jdbi.e2e.impl;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.argument.AbstractArgumentFactory;
 import org.jdbi.v3.core.argument.Argument;

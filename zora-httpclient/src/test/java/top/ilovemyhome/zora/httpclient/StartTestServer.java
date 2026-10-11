@@ -1,6 +1,6 @@
 package top.ilovemyhome.zora.httpclient;
 
-import com.fasterxml.jackson.jakarta.rs.json.JacksonJsonProvider;
+import tools.jackson.jakarta.rs.json.JacksonJsonProvider;
 import io.muserver.Method;
 import io.muserver.MuServer;
 import io.muserver.rest.RestHandlerBuilder;

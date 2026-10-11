@@ -1,12 +1,11 @@
 package top.ilovemyhome.zora.rocksdb.graph.codec;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.smile.SmileFactory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.dataformat.smile.SmileFactory;
 import top.ilovemyhome.zora.rocksdb.graph.model.Edge;
 import top.ilovemyhome.zora.rocksdb.graph.model.Vertex;
 
-import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -39,7 +38,7 @@ public final class ValueCodec {
         try {
             VertexPojo pojo = new VertexPojo(vertex.getId(), vertex.getTypeId(), vertex.getProperties());
             return MAPPER.writeValueAsBytes(pojo);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException("Failed to serialize vertex: " + vertex, e);
         }
     }
@@ -48,7 +47,7 @@ public final class ValueCodec {
         try {
             VertexPojo pojo = MAPPER.readValue(bytes, VertexPojo.class);
             return new Vertex(pojo.id, pojo.typeId, pojo.properties);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException("Failed to deserialize vertex", e);
         }
     }
@@ -59,7 +58,7 @@ public final class ValueCodec {
         try {
             EdgePojo pojo = new EdgePojo(edge.getSrcId(), edge.getDstId(), edge.getTypeId(), edge.getProperties());
             return MAPPER.writeValueAsBytes(pojo);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException("Failed to serialize edge: " + edge, e);
         }
     }
@@ -68,7 +67,7 @@ public final class ValueCodec {
         try {
             EdgePojo pojo = MAPPER.readValue(bytes, EdgePojo.class);
             return new Edge(pojo.srcId, pojo.dstId, pojo.typeId, pojo.properties);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException("Failed to deserialize edge", e);
         }
     }

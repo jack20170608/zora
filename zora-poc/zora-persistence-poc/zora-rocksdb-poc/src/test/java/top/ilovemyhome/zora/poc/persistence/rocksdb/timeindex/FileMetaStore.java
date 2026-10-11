@@ -1,6 +1,6 @@
 package top.ilovemyhome.zora.poc.persistence.rocksdb.timeindex;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.rocksdb.*;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;

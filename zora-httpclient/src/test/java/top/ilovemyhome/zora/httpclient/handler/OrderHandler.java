@@ -1,9 +1,10 @@
 package top.ilovemyhome.zora.httpclient.handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import io.muserver.MuRequest;
 import io.muserver.UploadedFile;
 import io.muserver.rest.Description;
@@ -33,7 +34,7 @@ public class OrderHandler {
     public Response getAll() {
         try {
             return Response.ok(MAPPER.writeValueAsString(ORDER_DB.values())).build();
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             LOGGER.warn("Json process error", e);
             return Response.serverError().build();
         }
@@ -53,7 +54,7 @@ public class OrderHandler {
         Order order = Optional.ofNullable(ORDER_DB.get(id)).orElseThrow(() -> new NotFoundException("Order with id " + id + " not found"));
         try {
             return Response.ok(MAPPER.writeValueAsString(order)).build();
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             LOGGER.warn("Json process error", e);
             return Response.serverError().build();
         }
@@ -161,15 +162,16 @@ public class OrderHandler {
 
     private final String tempDir = System.getProperty("java.io.tmpdir");
 
-    private static ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .disable(SerializationFeature.INDENT_OUTPUT)
+        .build();
     private static final AtomicLong ID_GENERATOR = new AtomicLong();
     private static final AtomicInteger SEQ_GENERATOR = new AtomicInteger();
     private static final Map<Long, Order> ORDER_DB = new HashMap<>();
 
     static {
         reset();
-        MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        MAPPER.configure(SerializationFeature.INDENT_OUTPUT, false);
     }
 
     private static void reset() {

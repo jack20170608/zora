@@ -1,6 +1,5 @@
 package top.ilovemyhome.zora.rocksdb.graph.store;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,7 +35,6 @@ class ComponentCostBenchmarkTest {
 
     @Test
     void jacksonEncodeDecodeNarrow() throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
         Vertex narrow = new Vertex(1L, 1)
             .withProperty("name", "Alice").withProperty("age", 30);
         byte[] encoded = ValueCodec.encodeVertex(narrow);

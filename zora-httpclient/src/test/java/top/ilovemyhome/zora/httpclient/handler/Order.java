@@ -1,7 +1,10 @@
 package top.ilovemyhome.zora.httpclient.handler;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
 import java.math.BigDecimal;
 
+@JsonPropertyOrder({"id", "counterparty", "amount"})
 public class Order {
 
     private Long id;

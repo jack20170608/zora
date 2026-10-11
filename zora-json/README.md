@@ -6,13 +6,13 @@ JSON processing utilities for zora project, based on Jackson.
 
 - Provides `JacksonUtil` - static utility class for common JSON operations
 - Pre-configured `ObjectMapper` with:
-  - `JavaTimeModule` for Java 8+ `java.time` API support
+  - Jackson 3 内置的 Java Time 编解码器，通过 `SimpleModule` 覆盖日期格式
   - Custom date/time format patterns:
     - `LocalDate`: `yyyy-MM-dd`
     - `LocalDateTime`: `yyyy-MM-dd HH:mm:ss.SSS`
     - `LocalTime`: `HH:mm:ss.SSS`
     - `YearMonth`: `yyyyMM`
-- Disabled `FAIL_ON_UNKNOWN_PROPERTIES` by default
+- 默认启用 `FAIL_ON_UNKNOWN_PROPERTIES`，拒绝未知字段
 - Pretty-print output enabled by default
 
 ## Maven Dependency
@@ -29,6 +29,7 @@ JSON processing utilities for zora project, based on Jackson.
 
 ```java
 import top.ilovemyhome.zora.json.jackson.JacksonUtil;
+import tools.jackson.core.type.TypeReference;
 
 // Serialize object to JSON string
 String json = JacksonUtil.toJson(obj);
@@ -54,8 +55,8 @@ Default date/time formats are defined in `top.ilovemyhome.zora.json.Constants`:
 ## Dependencies
 
 - `zora-common` - zora common utilities
-- `com.fasterxml.jackson.core:jackson-databind` - Jackson core
-- `com.fasterxml.jackson.datatype:jackson-datatype-jsr310` - Java 8 date/time support
+- `tools.jackson.core:jackson-databind`（Jackson 3，调用方需要提供）
+- `com.fasterxml.jackson.core:jackson-annotations:2.22`（Jackson 3 自身的传递依赖，由 BOM 管理）
 - `org.slf4j:slf4j-api` - logging API
 
 ## License

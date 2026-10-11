@@ -1,22 +1,23 @@
 package top.ilovemyhome.zora.json.jackson;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalTimeDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.deser.YearMonthDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalTimeSerializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.YearMonthSerializer;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ext.javatime.deser.LocalDateDeserializer;
+import tools.jackson.databind.ext.javatime.deser.LocalDateTimeDeserializer;
+import tools.jackson.databind.ext.javatime.deser.LocalTimeDeserializer;
+import tools.jackson.databind.ext.javatime.deser.YearMonthDeserializer;
+import tools.jackson.databind.ext.javatime.ser.LocalDateSerializer;
+import tools.jackson.databind.ext.javatime.ser.LocalDateTimeSerializer;
+import tools.jackson.databind.ext.javatime.ser.LocalTimeSerializer;
+import tools.jackson.databind.ext.javatime.ser.YearMonthSerializer;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.module.SimpleModule;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,7 +38,7 @@ public final class JacksonUtil {
         }
         try {
             return MAPPER.writeValueAsString(obj);
-        }catch (JsonProcessingException e){
+        }catch (JacksonException e){
             LOGGER.error("Failed serializing object to json.", e);
             throw new RuntimeException(e);
         }
@@ -49,9 +50,9 @@ public final class JacksonUtil {
         }
         try {
             return MAPPER.readValue(json, clazz);
-        }catch (Throwable t){
-            LOGGER.error("Failed deserializing object to json.", t);
-            throw new RuntimeException(t);
+        }catch (JacksonException e){
+            LOGGER.error("Failed deserializing object from json.", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -62,15 +63,14 @@ public final class JacksonUtil {
         }
         try {
             return MAPPER.readValue(json, typeReference);
-        }catch (Throwable t){
-            LOGGER.error("Failed deserializing object to json.", t);
-            throw new RuntimeException(t);
+        }catch (JacksonException e){
+            LOGGER.error("Failed deserializing object from json.", e);
+            throw new RuntimeException(e);
         }
     }
 
     static {
-        MAPPER = new ObjectMapper();
-        JavaTimeModule javaTimeModule = new JavaTimeModule();
+        SimpleModule javaTimeModule = new SimpleModule();
         javaTimeModule.addDeserializer(LocalDate.class,
             new LocalDateDeserializer(DateTimeFormatter.ofPattern(JSON_DATE_FORMAT)));
         javaTimeModule.addDeserializer(LocalDateTime.class,
@@ -91,10 +91,11 @@ public final class JacksonUtil {
 
 
 
-        MAPPER.registerModule(javaTimeModule);
-        MAPPER.configure(SerializationFeature.WRITE_DATE_KEYS_AS_TIMESTAMPS, false);
-        MAPPER.configure(SerializationFeature.INDENT_OUTPUT, true);
-        MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        MAPPER = JsonMapper.builder()
+            .addModule(javaTimeModule)
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build();
     }
 
 

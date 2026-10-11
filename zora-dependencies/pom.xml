@@ -26,7 +26,7 @@
         <flyway.version>11.8.2</flyway.version>
         <mockito.version>5.23.0</mockito.version>
         <assertj.version>3.27.7</assertj.version>
-        <jackson.version>2.21.3</jackson.version>
+        <jackson.version>3.2.3</jackson.version>
         <jdbi3.version>3.53.0</jdbi3.version>
         <muserver.version>2.4.3</muserver.version>
         <rocksdb.version>9.10.0</rocksdb.version>
@@ -70,7 +70,17 @@
             </dependency>
             <dependency>
                 <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt</artifactId>
+                <artifactId>jjwt-api</artifactId>
+                <version>0.13.0</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>0.13.0</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-gson</artifactId>
                 <version>0.13.0</version>
             </dependency>
             <dependency>
@@ -134,12 +144,12 @@
                 <artifactId>HikariCP</artifactId>
                 <version>7.0.2</version>
             </dependency>
-            <!-- the Jackson bom -->
-            <!-- Source: https://mvnrepository.com/artifact/com.fasterxml.jackson/jackson-bom -->
+            <!-- Jackson 3 BOM also manages its required Jackson annotations dependency. -->
+            <!-- Source: https://mvnrepository.com/artifact/tools.jackson/jackson-bom -->
             <dependency>
-                <groupId>com.fasterxml.jackson</groupId>
+                <groupId>tools.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
-                <version>2.21.2</version>
+                <version>${jackson.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -147,7 +157,7 @@
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-bom</artifactId>
-                <version>1.16.1</version>
+                <version>1.17.1</version>
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
