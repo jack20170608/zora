@@ -2,6 +2,7 @@ package top.ilovemyhome.zora.rdb.flyway;
 
 import liquibase.Contexts;
 import liquibase.Liquibase;
+import liquibase.LabelExpression;
 import liquibase.changelog.ChangeSet;
 import liquibase.changelog.DatabaseChangeLog;
 import liquibase.change.core.RawSQLChange;
@@ -20,13 +21,14 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -59,19 +61,19 @@ public final class SqlMigrationEngine {
     }
 
     public int pendingCount() {
-        return run(liquibase -> liquibase.listUnrunChangeSets(new Contexts()).size());
+        return run(liquibase -> liquibase.listUnrunChangeSets(new Contexts(), new LabelExpression()).size());
     }
 
     public int migrate() {
         return run(liquibase -> {
-            int pending = liquibase.listUnrunChangeSets(new Contexts()).size();
+            int pending = liquibase.listUnrunChangeSets(new Contexts(), new LabelExpression()).size();
             liquibase.update();
             return pending;
         });
     }
 
     public void validate() {
-        run(liquibase -> { liquibase.getChangeSetStatuses(new Contexts()); return null; });
+        run(liquibase -> { liquibase.listUnrunChangeSets(new Contexts(), new LabelExpression()); return null; });
     }
 
     public void clean() {
@@ -82,7 +84,7 @@ public final class SqlMigrationEngine {
     }
 
     public void baseline() {
-        run(liquibase -> { liquibase.changeLogSync(new Contexts()); return null; });
+        run(liquibase -> { liquibase.changeLogSync(new Contexts(), new LabelExpression()); return null; });
     }
 
     public void repair() {
@@ -90,7 +92,7 @@ public final class SqlMigrationEngine {
     }
 
     public List<MigrationStatus> info() {
-        return run(liquibase -> liquibase.getChangeSetStatuses(new Contexts()).stream()
+        return run(liquibase -> liquibase.getChangeSetStatuses(new Contexts(), new LabelExpression()).stream()
             .map(status -> new MigrationStatus(status.getChangeSet().getId(),
                 status.getChangeSet().getComments(), status.getPreviouslyRan())).toList());
     }
@@ -104,11 +106,8 @@ public final class SqlMigrationEngine {
             if (table != null) database.setDatabaseChangeLogTableName(table);
             if (schema != null) database.setDefaultSchemaName(schema);
             try (ResourceAccessor accessor = accessor()) {
-                DatabaseChangeLog changeLog = changeLog(accessor);
+                DatabaseChangeLog changeLog = changeLog();
                 Liquibase liquibase = new Liquibase(changeLog, accessor, database);
-                if (placeholderReplacement) {
-                    placeholders.forEach((key, value) -> liquibase.setChangeLogParameter(key, value));
-                }
                 return operation.execute(liquibase);
             }
         } catch (Exception e) {
@@ -130,28 +129,36 @@ public final class SqlMigrationEngine {
         return new liquibase.resource.CompositeResourceAccessor(accessors.toArray(ResourceAccessor[]::new));
     }
 
-    private DatabaseChangeLog changeLog(ResourceAccessor accessor) throws IOException {
+    private DatabaseChangeLog changeLog() throws Exception {
         DatabaseChangeLog changeLog = new DatabaseChangeLog("zora-sql-migrations:" + String.join(",", locations));
         List<Script> scripts = new ArrayList<>();
         for (String location : locations) {
             String directory = location.startsWith("classpath:") ? location.substring("classpath:".length()) : "";
-            for (Resource resource : accessor.search(directory, false)) {
-                String filename = Path.of(resource.getPath()).getFileName().toString();
-                Matcher matcher = SCRIPT.matcher(filename);
-                if (matcher.matches() && (targetVersion == null || compareVersions(matcher.group(1), targetVersion) <= 0)) {
-                    scripts.add(new Script(matcher.group(1), matcher.group(2).replace('_', ' '), resource));
+            try (ResourceAccessor source = location.startsWith("classpath:")
+                ? new ClassLoaderResourceAccessor()
+                : new DirectoryResourceAccessor(Path.of(location.substring("filesystem:".length())))) {
+                for (Resource resource : source.search(directory, false)) {
+                    String filename = Path.of(resource.getPath()).getFileName().toString();
+                    Matcher matcher = SCRIPT.matcher(filename);
+                    if (matcher.matches() && (targetVersion == null || compareVersions(matcher.group(1), targetVersion) <= 0)) {
+                        try (InputStream input = resource.openInputStream()) {
+                            scripts.add(new Script(matcher.group(1), matcher.group(2).replace('_', ' '),
+                                new String(input.readAllBytes(), StandardCharsets.UTF_8)));
+                        }
+                    }
                 }
             }
         }
         scripts.sort(Comparator.comparing(Script::version, SqlMigrationEngine::compareVersions));
+        Set<String> versions = new HashSet<>();
         for (Script script : scripts) {
+            if (!versions.add(script.version())) {
+                throw new IllegalArgumentException("Duplicate SQL migration version: " + script.version());
+            }
             ChangeSet changeSet = new ChangeSet(script.version(), "zora", false, false,
                 changeLog.getFilePath(), null, null, changeLog);
             changeSet.setComments(script.description());
-            String content;
-            try (InputStream input = script.resource().openInputStream()) {
-                content = new String(input.readAllBytes(), StandardCharsets.UTF_8);
-            }
+            String content = script.sql();
             if (placeholderReplacement) {
                 for (Map.Entry<String, String> entry : placeholders.entrySet()) {
                     content = content.replace("${" + entry.getKey() + "}", entry.getValue());
@@ -176,7 +183,7 @@ public final class SqlMigrationEngine {
         return 0;
     }
 
-    private record Script(String version, String description, Resource resource) { }
+    private record Script(String version, String description, String sql) { }
 
     @FunctionalInterface
     private interface Operation<T> {

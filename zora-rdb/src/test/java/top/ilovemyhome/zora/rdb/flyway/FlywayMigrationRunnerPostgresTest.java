@@ -43,7 +43,6 @@ class FlywayMigrationRunnerPostgresTest {
         dataSource = DataSourcePoolBuilder.create(config).build();
         runner = FlywayMigrationRunner.builder(dataSource)
             .locations("classpath:db/migration")
-            .baselineOnMigrate(true)
             .build();
     }
 
@@ -58,7 +57,7 @@ class FlywayMigrationRunnerPostgresTest {
     @Test
     void testMigrate() {
         var result = runner.migrate();
-        assertThat(result).isNotNull();
+        assertThat(result).isEqualTo(2);
     }
 
     @Test
@@ -130,7 +129,6 @@ class FlywayMigrationRunnerPostgresTest {
 
         runner = FlywayMigrationRunner.builder(dataSource)
             .locations("classpath:db/migration")
-            .baselineOnMigrate(true)
             .placeholder("key1", "value1")
             .placeholder("key2", "value2")
             .build();
@@ -138,7 +136,7 @@ class FlywayMigrationRunnerPostgresTest {
         assertThat(runner.getFlyway()).isNotNull();
         assertThat(runner.hasPendingMigrations()).isTrue();
         var result = runner.migrate();
-        assertThat(result).isNotNull();
+        assertThat(result).isEqualTo(2);
         assertThat(runner.hasPendingMigrations()).isFalse();
     }
 
@@ -166,13 +164,12 @@ class FlywayMigrationRunnerPostgresTest {
         // The migration script contains ${table_name} which will be replaced
         runner = FlywayMigrationRunner.builder(dataSource)
             .locations("classpath:db/migration_with_placeholder")
-            .baselineOnMigrate(true)
             .placeholder("table_name", "dynamic_table")
             .build();
 
         assertThat(runner.hasPendingMigrations()).isTrue();
         var result = runner.migrate();
-        assertThat(result).isNotNull();
+        assertThat(result).isEqualTo(1);
         assertThat(runner.hasPendingMigrations()).isFalse();
 
         // Verify the table was actually created with the replaced name

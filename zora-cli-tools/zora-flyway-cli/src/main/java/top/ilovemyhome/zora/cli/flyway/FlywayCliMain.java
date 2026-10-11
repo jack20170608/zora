@@ -7,19 +7,17 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import top.ilovemyhome.zora.rdb.flyway.SqlMigrationEngine;
 
-import java.io.File;
 import java.util.Map;
-import java.util.Properties;
 
 import static picocli.CommandLine.*;
 
 /**
- * Command-line tool for managing Flyway database migrations.
- * Provides simplified interface for common Flyway operations.
+ * Command-line tool for SQL database migrations backed by Liquibase.
+ * The command name is retained for existing launch scripts.
  */
 @picocli.CommandLine.Command(
         name = "zora-flyway-cli",
-        description = "Flyway database migration command-line tool",
+        description = "SQL database migration command-line tool",
         version = "1.0.0",
         mixinStandardHelpOptions = true,
         subcommands = {
@@ -113,12 +111,6 @@ public class FlywayCliMain {
         @Option(names = {"-l", "--locations"}, description = "Comma-separated list of migration locations")
         String locations = "filesystem:./sql";
 
-        @Option(names = {"-b", "--baseline-version"}, description = "Baseline version for existing database")
-        String baselineVersion;
-
-        @Option(names = {"-c", "--config-file"}, description = "Flyway properties configuration file")
-        File configFile;
-
         @Option(names = {"-P", "--placeholder"}, description = "Placeholders in format key=value. Can be specified multiple times.", paramLabel = "key=value")
         Map<String, String> placeholders = new java.util.HashMap<>();
 
@@ -147,15 +139,6 @@ public class FlywayCliMain {
             config.setPassword(password);
             if (driver != null) {
                 config.setDriverClassName(driver);
-            }
-            if (configFile != null && configFile.exists()) {
-                Properties properties = new Properties();
-                try {
-                    properties.load(new java.io.FileReader(configFile));
-                    locations = properties.getProperty("locations", locations);
-                } catch (Exception e) {
-                    LOGGER.warn("Failed to load config file: {}", e.getMessage());
-                }
             }
             return new SqlMigrationEngine(new HikariDataSource(config), locations.split(","),
                 null, null, null, placeholders, placeholderReplacement, cleanDisabled);

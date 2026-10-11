@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Flyway database migration runner with simplified configuration.
+ * Versioned SQL migration runner backed by Liquibase; the class name is retained for existing callers.
  */
 public class FlywayMigrationRunner {
 
@@ -26,7 +26,7 @@ public class FlywayMigrationRunner {
     }
 
     /**
-     * Create a new builder for FlywayMigrationRunner.
+     * Create a new builder for the migration runner.
      *
      * @param dataSource the DataSource to use for migration
      * @return new builder instance
@@ -36,9 +36,9 @@ public class FlywayMigrationRunner {
     }
 
     /**
-     * Get the configured Flyway instance.
+     * Get the configured SQL migration engine.
      *
-     * @return Flyway instance
+     * @return migration engine
      */
     public SqlMigrationEngine getFlyway() {
         return engine;
@@ -47,12 +47,12 @@ public class FlywayMigrationRunner {
     /**
      * Execute the migration.
      *
-     * @return migration result
+     * @return number of migrations applied
      */
     public int migrate() {
-        LOGGER.info("Starting Flyway database migration...");
+        LOGGER.info("Starting SQL database migration...");
         int result = engine.migrate();
-        LOGGER.info("Flyway migration completed successfully");
+        LOGGER.info("SQL migration completed successfully");
         return result;
     }
 
@@ -78,9 +78,9 @@ public class FlywayMigrationRunner {
      * Validate applied migrations.
      */
     public void validate() {
-        LOGGER.info("Validating Flyway migrations...");
+        LOGGER.info("Validating SQL migrations...");
         engine.validate();
-        LOGGER.info("Flyway validation completed successfully");
+        LOGGER.info("SQL migration validation completed successfully");
     }
 
     /**
@@ -88,7 +88,7 @@ public class FlywayMigrationRunner {
      * WARNING: This is destructive and should only be used in development/testing.
      */
     public void clean() {
-        LOGGER.warn("Cleaning database with Flyway - all objects will be dropped!");
+        LOGGER.warn("Cleaning database - all objects will be dropped!");
         engine.clean();
         LOGGER.info("Database clean completed");
     }
@@ -97,9 +97,9 @@ public class FlywayMigrationRunner {
      * Baseline existing database.
      */
     public void baseline() {
-        LOGGER.info("Creating Flyway baseline...");
+        LOGGER.info("Creating SQL migration baseline...");
         engine.baseline();
-        LOGGER.info("Flyway baseline created");
+        LOGGER.info("SQL migration baseline created");
     }
 
     /**
@@ -108,15 +108,9 @@ public class FlywayMigrationRunner {
     public static class Builder {
         private final DataSource dataSource;
         private String[] locations = new String[]{"classpath:db/migration"};
-        private boolean baselineOnMigrate = true;
-        private String baselineVersion = "1";
-        private String baselineDescription = "<< Flyway Baseline >>";
-        private boolean cleanOnValidationError = false;
-        private boolean validateOnMigrate = true;
         private String targetVersion;
         private String table;
         private String defaultSchema;
-        private String[] schemas;
         private Map<String, String> placeholders = new HashMap<>();
 
         public Builder(DataSource dataSource) {
@@ -125,31 +119,6 @@ public class FlywayMigrationRunner {
 
         public Builder locations(String... locations) {
             this.locations = locations;
-            return this;
-        }
-
-        public Builder baselineOnMigrate(boolean baselineOnMigrate) {
-            this.baselineOnMigrate = baselineOnMigrate;
-            return this;
-        }
-
-        public Builder baselineVersion(String baselineVersion) {
-            this.baselineVersion = baselineVersion;
-            return this;
-        }
-
-        public Builder baselineDescription(String baselineDescription) {
-            this.baselineDescription = baselineDescription;
-            return this;
-        }
-
-        public Builder cleanOnValidationError(boolean cleanOnValidationError) {
-            this.cleanOnValidationError = cleanOnValidationError;
-            return this;
-        }
-
-        public Builder validateOnMigrate(boolean validateOnMigrate) {
-            this.validateOnMigrate = validateOnMigrate;
             return this;
         }
 
@@ -165,11 +134,6 @@ public class FlywayMigrationRunner {
 
         public Builder defaultSchema(String defaultSchema) {
             this.defaultSchema = defaultSchema;
-            return this;
-        }
-
-        public Builder schemas(String... schemas) {
-            this.schemas = schemas;
             return this;
         }
 

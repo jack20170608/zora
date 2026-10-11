@@ -1,11 +1,11 @@
 # zora-rdb - Relational Database Utilities
 
-zora-rdb 是 zora 框架中提供关系型数据库通用功能的模块，提供了数据库连接池管理、Flyway 数据库迁移等通用功能。
+zora-rdb 是 zora 框架中提供关系型数据库通用功能的模块，提供数据库连接池管理和基于 Liquibase 的 SQL 脚本迁移。
 
 ## 功能特性
 
 - **连接池管理**: 基于 HikariCP 封装的高性能数据库连接池
-- **Flyway 迁移**: 简化 Flyway 数据库版本迁移的配置和启动
+- **SQL 迁移**: 使用 Liquibase 执行 `V<版本>__<描述>.sql` 脚本
 - **配置支持**: 集成 zora-config 实现灵活的外部化配置
 
 ## 使用方法
@@ -36,18 +36,19 @@ RdbConfig config = RdbConfig.builder()
 HikariDataSource dataSource = DataSourcePoolBuilder.create(config).build();
 ```
 
-### Flyway 迁移使用
+### SQL 迁移使用
 
 ```java
-// 创建 Flyway 实例
-Flyway flyway = FlywayBuilder.create(dataSource)
+// 历史类名保留，底层迁移引擎已改为 Liquibase
+FlywayMigrationRunner runner = FlywayMigrationRunner.builder(dataSource)
     .locations("classpath:db/migration")
-    .baselineOnMigrate(true)
     .build();
 
 // 执行迁移
-flyway.migrate();
+int applied = runner.migrate();
 ```
+
+Liquibase 使用新的 `databasechangelog` 历史表，不自动导入旧 `flyway_schema_history`。已有数据库升级前请先制定历史迁移方案，避免重新执行已应用的 SQL。
 
 ## 模块结构
 
@@ -59,7 +60,7 @@ zora-rdb
 │   │   │   └── top/ilovemyhome/zora/rdb
 │   │   │       ├── config   # 配置类
 │   │   │       ├── pool     # 连接池相关
-│   │   │       └── flyway   # Flyway 迁移相关
+│   │   │       └── flyway   # 历史包名，内部是 Liquibase 迁移引擎
 │   │   └── resources
 │   │       └── metadata
 │   │           └── metadata.json
