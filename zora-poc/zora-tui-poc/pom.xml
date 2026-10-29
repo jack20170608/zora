@@ -18,6 +18,7 @@
 
     <modules>
         <module>zora-claude-tui-poc</module>
+        <module>zora-tamboui-poc</module>
     </modules>
 
     <build>
